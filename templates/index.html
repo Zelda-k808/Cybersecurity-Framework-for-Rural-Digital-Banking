@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="card">
+    <h2>Welcome</h2>
+    <p>This demo project provides secure digital banking workflows with simple usability for rural users.</p>
+    <ul>
+        <li>OTP-based login (simulated for demo)</li>
+        <li>Password hashing with bcrypt</li>
+        <li>Login attempt monitoring and temporary lockouts</li>
+        <li>Transaction logging and activity audit trails</li>
+    </ul>
+    <div class="button-row">
+        <a class="btn" href="{{ url_for('register') }}">{{ lang_data.register }}</a>
+        <a class="btn alt" href="{{ url_for('login') }}">{{ lang_data.login }}</a>
+    </div>
+</section>
+{% endblock %}

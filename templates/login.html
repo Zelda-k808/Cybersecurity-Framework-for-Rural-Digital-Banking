@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="card form-card">
+    <h2>Login</h2>
+    <form method="POST">
+        <label>Email</label>
+        <input type="email" name="email" required />
+
+        <label>Password</label>
+        <input type="password" name="password" required />
+
+        <button type="submit" class="btn">Generate OTP</button>
+    </form>
+    <p class="hint">For this demo, OTP appears in the on-screen alert.</p>
+</section>
+{% endblock %}

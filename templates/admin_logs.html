@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="card">
+    <h2>Admin Security Logs</h2>
+    <p class="hint">Visible only to users with role <strong>admin</strong>.</p>
+    {% if logs %}
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>User ID</th>
+                    <th>Event</th>
+                    <th>IP</th>
+                    <th>Description</th>
+                    <th>Time (UTC)</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for log in logs %}
+                    <tr>
+                        <td>{{ log.user_id or "-" }}</td>
+                        <td>{{ log.event_type }}</td>
+                        <td>{{ log.ip_address }}</td>
+                        <td>{{ log.description }}</td>
+                        <td>{{ log.created_at }}</td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    {% else %}
+        <p>No security logs available yet.</p>
+    {% endif %}
+</section>
+{% endblock %}

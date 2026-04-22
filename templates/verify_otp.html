@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="card form-card">
+    <h2>Verify OTP</h2>
+    <p>OTP sent to account: <strong>{{ email }}</strong></p>
+    <p class="hint">Offline fallback simulation: OTP can be imagined as SMS delivery in low-network zones.</p>
+    <form method="POST">
+        <label>6-digit OTP</label>
+        <input type="text" name="otp" required minlength="6" maxlength="6" />
+        <button type="submit" class="btn">Verify and Login</button>
+    </form>
+</section>
+{% endblock %}

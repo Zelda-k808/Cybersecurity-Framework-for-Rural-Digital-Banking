@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="card">
+    <h2>Transaction History</h2>
+    {% if transactions %}
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>Type</th>
+                    <th>Amount</th>
+                    <th>Receiver</th>
+                    <th>Note</th>
+                    <th>Time (UTC)</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for t in transactions %}
+                    <tr>
+                        <td>{{ t.txn_type }}</td>
+                        <td>INR {{ "%.2f"|format(t.amount) }}</td>
+                        <td>{{ t.receiver_name or "-" }}</td>
+                        <td>{{ t.note or "-" }}</td>
+                        <td>{{ t.created_at }}</td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    {% else %}
+        <p>No transactions yet.</p>
+    {% endif %}
+</section>
+{% endblock %}
