@@ -3,9 +3,10 @@ import os
 import random
 import re
 import sqlite3
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 import validators
+from click import echo
 from flask import Flask, flash, g, redirect, render_template, request, session, url_for
 from flask_bcrypt import Bcrypt
 from flask_login import (LoginManager, UserMixin, current_user, login_required,
@@ -13,7 +14,6 @@ from flask_login import (LoginManager, UserMixin, current_user, login_required,
 
 
 BASE_DIR = os.path.abspath(os.path.dirname(__file__))
-DATABASE = os.path.join(BASE_DIR, "banking.db")
 MAX_FAILED_ATTEMPTS = 5
 LOCK_MINUTES = 15
 
@@ -41,6 +41,7 @@ LANG_CONTENT = {
 
 app = Flask(__name__)
 app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", "dev-secret-key-change-me")
+app.config["DATABASE"] = os.environ.get("DATABASE_PATH", os.path.join(BASE_DIR, "banking.db"))
 bcrypt = Bcrypt(app)
 login_manager = LoginManager(app)
 login_manager.login_view = "login"
@@ -66,7 +67,7 @@ class User(UserMixin):
 
 def get_db():
     if "db" not in g:
-        g.db = sqlite3.connect(DATABASE)
+        g.db = sqlite3.connect(app.config["DATABASE"])
         g.db.row_factory = sqlite3.Row
     return g.db
 
@@ -126,7 +127,7 @@ def init_db():
 
 
 def now_iso():
-    return datetime.utcnow().isoformat()
+    return datetime.now(timezone.utc).isoformat()
 
 
 def get_client_ip():
@@ -166,6 +167,39 @@ def get_user_by_email(email):
     return User(row["id"], row["full_name"], row["email"], row["password_hash"], row["role"])
 
 
+def create_admin_user(full_name, email, password):
+    existing = get_user_by_email(email)
+    if existing:
+        return False, "Admin already exists with this email."
+
+    password_hash = bcrypt.generate_password_hash(password).decode("utf-8")
+    db = get_db()
+    db.execute(
+        """
+        INSERT INTO users (full_name, email, password_hash, role, created_at)
+        VALUES (?, ?, ?, 'admin', ?)
+        """,
+        (full_name, email, password_hash, now_iso()),
+    )
+    db.commit()
+    return True, "Admin user created successfully."
+
+
+@app.cli.command("seed-admin")
+def seed_admin():
+    full_name = os.environ.get("ADMIN_NAME", "Project Admin")
+    email = os.environ.get("ADMIN_EMAIL", "admin@ruralbank.local").strip().lower()
+    password = os.environ.get("ADMIN_PASSWORD", "Admin@12345")
+
+    with app.app_context():
+        init_db()
+        created, message = create_admin_user(full_name, email, password)
+        echo(message)
+        if created:
+            echo(f"Email: {email}")
+            echo("Use ADMIN_PASSWORD env var to set a custom password.")
+
+
 @login_manager.user_loader
 def load_user(user_id):
     db = get_db()
@@ -184,7 +218,7 @@ def is_locked(email, ip_address):
 
     if row and row["locked_until"]:
         lock_until = datetime.fromisoformat(row["locked_until"])
-        if datetime.utcnow() < lock_until:
+        if datetime.now(timezone.utc) < lock_until:
             return True, f"Account temporarily locked until {lock_until.strftime('%H:%M:%S')} UTC."
     return False, None
 
@@ -207,7 +241,7 @@ def record_login_attempt(email, ip_address, success):
     if row:
         failed_count = row["failed_count"] + 1
     if failed_count >= MAX_FAILED_ATTEMPTS:
-        lock_until = (datetime.utcnow() + timedelta(minutes=LOCK_MINUTES)).isoformat()
+        lock_until = (datetime.now(timezone.utc) + timedelta(minutes=LOCK_MINUTES)).isoformat()
 
     if row:
         db.execute(
@@ -318,7 +352,7 @@ def login():
         otp = str(random.randint(100000, 999999))
         session["pending_user_email"] = user.email
         session["pending_otp"] = otp
-        session["pending_otp_expiry"] = (datetime.utcnow() + timedelta(minutes=3)).isoformat()
+        session["pending_otp_expiry"] = (datetime.now(timezone.utc) + timedelta(minutes=3)).isoformat()
 
         log_activity(user.id, "otp_generated", "OTP generated for second-factor login")
         flash(f"OTP (simulation): {otp}", "info")
@@ -339,7 +373,7 @@ def verify_otp():
 
     if request.method == "POST":
         submitted = request.form.get("otp", "").strip()
-        if datetime.utcnow() > datetime.fromisoformat(expiry):
+        if datetime.now(timezone.utc) > datetime.fromisoformat(expiry):
             session.pop("pending_user_email", None)
             session.pop("pending_otp", None)
             session.pop("pending_otp_expiry", None)
