@@ -9,8 +9,13 @@
         <label>Password</label>
         <input type="password" name="password" required />
 
-        <button type="submit" class="btn">Generate OTP</button>
+        <label>
+            <input type="checkbox" name="remember_me" />
+            Keep me signed in on this device
+        </label>
+
+        <button type="submit" class="btn">Login and Send OTP</button>
     </form>
-    <p class="hint">For this demo, OTP appears in the on-screen alert.</p>
+    <p class="hint">OTP is delivered to your registered email address.</p>
 </section>
 {% endblock %}

@@ -3,11 +3,14 @@
 <section class="card form-card">
     <h2>Verify OTP</h2>
     <p>OTP sent to account: <strong>{{ email }}</strong></p>
-    <p class="hint">Offline fallback simulation: OTP can be imagined as SMS delivery in low-network zones.</p>
+    <p class="hint">If email delivery is unavailable, this can be swapped with SMS OTP for rural deployment.</p>
     <form method="POST">
         <label>6-digit OTP</label>
-        <input type="text" name="otp" required minlength="6" maxlength="6" />
+        <input type="text" name="otp" required minlength="6" maxlength="6" pattern="[0-9]{6}" />
         <button type="submit" class="btn">Verify and Login</button>
+    </form>
+    <form method="POST" action="{{ url_for('resend_otp') }}">
+        <button type="submit" class="btn alt">Resend OTP</button>
     </form>
 </section>
 {% endblock %}

@@ -3,7 +3,9 @@ import os
 import random
 import re
 import sqlite3
+import smtplib
 from datetime import datetime, timedelta, timezone
+from email.message import EmailMessage
 
 import validators
 from click import echo
@@ -16,6 +18,8 @@ from flask_login import (LoginManager, UserMixin, current_user, login_required,
 BASE_DIR = os.path.abspath(os.path.dirname(__file__))
 MAX_FAILED_ATTEMPTS = 5
 LOCK_MINUTES = 15
+OTP_EXPIRY_MINUTES = 5
+OTP_MAX_ATTEMPTS = 5
 
 LANG_CONTENT = {
     "en": {
@@ -42,6 +46,12 @@ LANG_CONTENT = {
 app = Flask(__name__)
 app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", "dev-secret-key-change-me")
 app.config["DATABASE"] = os.environ.get("DATABASE_PATH", os.path.join(BASE_DIR, "banking.db"))
+app.config["SMTP_HOST"] = os.environ.get("SMTP_HOST", "")
+app.config["SMTP_PORT"] = int(os.environ.get("SMTP_PORT", "587"))
+app.config["SMTP_USERNAME"] = os.environ.get("SMTP_USERNAME", "")
+app.config["SMTP_PASSWORD"] = os.environ.get("SMTP_PASSWORD", "")
+app.config["SMTP_FROM"] = os.environ.get("SMTP_FROM", "noreply@ruralbank.local")
+app.config["SMTP_USE_TLS"] = os.environ.get("SMTP_USE_TLS", "1") == "1"
 bcrypt = Bcrypt(app)
 login_manager = LoginManager(app)
 login_manager.login_view = "login"
@@ -121,6 +131,16 @@ def init_db():
             description TEXT NOT NULL,
             created_at TEXT NOT NULL
         );
+
+        CREATE TABLE IF NOT EXISTS otp_challenges (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            email TEXT NOT NULL,
+            otp_hash TEXT NOT NULL,
+            expires_at TEXT NOT NULL,
+            attempts INTEGER NOT NULL DEFAULT 0,
+            consumed INTEGER NOT NULL DEFAULT 0,
+            created_at TEXT NOT NULL
+        );
         """
     )
     db.commit()
@@ -145,6 +165,18 @@ def validate_safe_text(value, field_name, max_len=80):
     return None
 
 
+def validate_password_strength(password):
+    if len(password) < 8:
+        return "Password must be at least 8 characters."
+    if not re.search(r"[A-Z]", password):
+        return "Password must include at least one uppercase letter."
+    if not re.search(r"[a-z]", password):
+        return "Password must include at least one lowercase letter."
+    if not re.search(r"[0-9]", password):
+        return "Password must include at least one digit."
+    return None
+
+
 def log_activity(user_id, event_type, description):
     ip = get_client_ip()
     logging.info("[%s] user=%s ip=%s %s", event_type, user_id, ip, description)
@@ -165,6 +197,81 @@ def get_user_by_email(email):
     if not row:
         return None
     return User(row["id"], row["full_name"], row["email"], row["password_hash"], row["role"])
+
+
+def clear_pending_auth():
+    session.pop("pending_user_email", None)
+
+
+def send_otp(email, otp_code):
+    if app.config.get("TESTING"):
+        app.config["LAST_SENT_OTP"] = otp_code
+        return True
+
+    smtp_host = app.config.get("SMTP_HOST")
+    smtp_username = app.config.get("SMTP_USERNAME")
+    smtp_password = app.config.get("SMTP_PASSWORD")
+
+    if not smtp_host or not smtp_username or not smtp_password:
+        logging.error("SMTP not configured. OTP delivery failed for %s", email)
+        return False
+
+    message = EmailMessage()
+    message["Subject"] = "Your Rural Banking OTP"
+    message["From"] = app.config.get("SMTP_FROM")
+    message["To"] = email
+    message.set_content(
+        f"Your one-time password is {otp_code}. It expires in {OTP_EXPIRY_MINUTES} minutes."
+    )
+
+    try:
+        with smtplib.SMTP(smtp_host, app.config.get("SMTP_PORT")) as server:
+            if app.config.get("SMTP_USE_TLS"):
+                server.starttls()
+            server.login(smtp_username, smtp_password)
+            server.send_message(message)
+        return True
+    except Exception as exc:  # noqa: BLE001
+        logging.error("Failed to send OTP email to %s: %s", email, exc)
+        return False
+
+
+def issue_otp_challenge(email):
+    otp_code = f"{random.randint(100000, 999999)}"
+    delivered = send_otp(email, otp_code)
+    if not delivered:
+        return False
+
+    otp_hash = bcrypt.generate_password_hash(otp_code).decode("utf-8")
+    db = get_db()
+    db.execute("DELETE FROM otp_challenges WHERE email = ? AND consumed = 0", (email,))
+    db.execute(
+        """
+        INSERT INTO otp_challenges (email, otp_hash, expires_at, attempts, consumed, created_at)
+        VALUES (?, ?, ?, 0, 0, ?)
+        """,
+        (
+            email,
+            otp_hash,
+            (datetime.now(timezone.utc) + timedelta(minutes=OTP_EXPIRY_MINUTES)).isoformat(),
+            now_iso(),
+        ),
+    )
+    db.commit()
+    return True
+
+
+def get_active_otp_challenge(email):
+    db = get_db()
+    return db.execute(
+        """
+        SELECT * FROM otp_challenges
+        WHERE email = ? AND consumed = 0
+        ORDER BY created_at DESC
+        LIMIT 1
+        """,
+        (email,),
+    ).fetchone()
 
 
 def create_admin_user(full_name, email, password):
@@ -303,8 +410,9 @@ def register():
         if not validators.email(email):
             flash("Enter a valid email address.", "danger")
             return redirect(url_for("register"))
-        if len(password) < 8:
-            flash("Password must be at least 8 characters.", "danger")
+        password_error = validate_password_strength(password)
+        if password_error:
+            flash(password_error, "danger")
             return redirect(url_for("register"))
         if get_user_by_email(email):
             flash("Email already registered.", "warning")
@@ -332,6 +440,11 @@ def login():
         email = request.form.get("email", "").strip().lower()
         password = request.form.get("password", "")
         ip = get_client_ip()
+        remember_me = request.form.get("remember_me") == "on"
+
+        if not validators.email(email):
+            flash("Enter a valid email address.", "danger")
+            return redirect(url_for("login"))
 
         user = get_user_by_email(email)
         locked, lock_message = is_locked(email, ip)
@@ -341,6 +454,7 @@ def login():
             return redirect(url_for("login"))
 
         if not user or not bcrypt.check_password_hash(user.password_hash, password):
+            clear_pending_auth()
             can_stay, message = record_login_attempt(email, ip, success=False)
             log_activity(None, "auth_failed", f"Failed login for email={email}")
             flash(message if message else "Invalid credentials.", "danger")
@@ -349,13 +463,18 @@ def login():
             return redirect(url_for("login"))
 
         record_login_attempt(email, ip, success=True)
-        otp = str(random.randint(100000, 999999))
         session["pending_user_email"] = user.email
-        session["pending_otp"] = otp
-        session["pending_otp_expiry"] = (datetime.now(timezone.utc) + timedelta(minutes=3)).isoformat()
+        session["pending_remember_me"] = remember_me
 
+        delivered = issue_otp_challenge(user.email)
         log_activity(user.id, "otp_generated", "OTP generated for second-factor login")
-        flash(f"OTP (simulation): {otp}", "info")
+        if delivered:
+            flash("OTP sent to your registered email.", "info")
+        else:
+            clear_pending_auth()
+            session.pop("pending_remember_me", None)
+            flash("OTP delivery failed. Please contact admin.", "danger")
+            return redirect(url_for("login"))
         return redirect(url_for("verify_otp"))
 
     return render_template("login.html")
@@ -364,23 +483,46 @@ def login():
 @app.route("/verify-otp", methods=["GET", "POST"])
 def verify_otp():
     email = session.get("pending_user_email")
-    otp = session.get("pending_otp")
-    expiry = session.get("pending_otp_expiry")
 
-    if not email or not otp or not expiry:
+    if not email:
         flash("Session expired. Please login again.", "warning")
+        return redirect(url_for("login"))
+
+    challenge = get_active_otp_challenge(email)
+    if not challenge:
+        clear_pending_auth()
+        flash("No active OTP challenge found. Please login again.", "warning")
         return redirect(url_for("login"))
 
     if request.method == "POST":
         submitted = request.form.get("otp", "").strip()
-        if datetime.now(timezone.utc) > datetime.fromisoformat(expiry):
-            session.pop("pending_user_email", None)
-            session.pop("pending_otp", None)
-            session.pop("pending_otp_expiry", None)
+        if not re.fullmatch(r"\d{6}", submitted):
+            flash("OTP must be a 6-digit code.", "danger")
+            return redirect(url_for("verify_otp"))
+
+        if datetime.now(timezone.utc) > datetime.fromisoformat(challenge["expires_at"]):
+            db = get_db()
+            db.execute("UPDATE otp_challenges SET consumed = 1 WHERE id = ?", (challenge["id"],))
+            db.commit()
+            clear_pending_auth()
             flash("OTP expired. Login again.", "danger")
             return redirect(url_for("login"))
 
-        if submitted != otp:
+        if challenge["attempts"] >= OTP_MAX_ATTEMPTS:
+            db = get_db()
+            db.execute("UPDATE otp_challenges SET consumed = 1 WHERE id = ?", (challenge["id"],))
+            db.commit()
+            clear_pending_auth()
+            flash("Too many OTP failures. Login again.", "danger")
+            return redirect(url_for("login"))
+
+        if not bcrypt.check_password_hash(challenge["otp_hash"], submitted):
+            db = get_db()
+            db.execute(
+                "UPDATE otp_challenges SET attempts = attempts + 1 WHERE id = ?",
+                (challenge["id"],),
+            )
+            db.commit()
             log_activity(None, "otp_failed", f"OTP verification failed for email={email}")
             flash("Incorrect OTP.", "danger")
             return redirect(url_for("verify_otp"))
@@ -409,15 +551,41 @@ def verify_otp():
             )
             flash("Alert: Login detected from a new location/IP.", "warning")
 
-        login_user(user)
-        session.pop("pending_user_email", None)
-        session.pop("pending_otp", None)
-        session.pop("pending_otp_expiry", None)
+        db.execute("UPDATE otp_challenges SET consumed = 1 WHERE id = ?", (challenge["id"],))
+        db.commit()
+
+        login_user(user, remember=session.get("pending_remember_me", False))
+        session.pop("pending_remember_me", None)
+        clear_pending_auth()
         log_activity(user.id, "login_success", "User logged in with OTP")
         flash("Login successful.", "success")
         return redirect(url_for("dashboard"))
 
     return render_template("verify_otp.html", email=email)
+
+
+@app.route("/resend-otp", methods=["POST"])
+def resend_otp():
+    email = session.get("pending_user_email")
+    if not email:
+        flash("Login session expired. Please login again.", "warning")
+        return redirect(url_for("login"))
+
+    challenge = get_active_otp_challenge(email)
+    if challenge and datetime.now(timezone.utc) < datetime.fromisoformat(challenge["expires_at"]):
+        # Do not allow spamming OTP generation while one is still active.
+        flash("An OTP is already active. Please use it or wait until it expires.", "warning")
+        return redirect(url_for("verify_otp"))
+
+    delivered = issue_otp_challenge(email)
+    user = get_user_by_email(email)
+    if user:
+        log_activity(user.id, "otp_resent", "OTP re-issued for login")
+    if delivered:
+        flash("A new OTP has been sent.", "info")
+    else:
+        flash("OTP delivery failed. Please contact admin.", "danger")
+    return redirect(url_for("verify_otp"))
 
 
 @app.route("/dashboard")

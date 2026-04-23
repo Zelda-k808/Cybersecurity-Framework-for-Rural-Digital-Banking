@@ -2,7 +2,7 @@ import os
 import tempfile
 import unittest
 
-from app import app, init_db
+from app import OTP_MAX_ATTEMPTS, app, init_db
 
 
 class SecurityTestCase(unittest.TestCase):
@@ -46,8 +46,7 @@ class SecurityTestCase(unittest.TestCase):
         )
 
     def complete_otp_step(self):
-        with self.client.session_transaction() as session_data:
-            otp = session_data.get("pending_otp")
+        otp = app.config.get("LAST_SENT_OTP")
         return self.client.post("/verify-otp", data={"otp": otp}, follow_redirects=True)
 
     def full_login(self):
@@ -72,13 +71,13 @@ class SecurityTestCase(unittest.TestCase):
         response = self.client.post(
             "/login",
             data={
-                "email": "' OR 1=1 --",
-                "password": "anything",
+                "email": "test@example.com",
+                "password": "' OR 1=1 --",
             },
             follow_redirects=True,
         )
         self.assertIn(b"Invalid credentials", response.data)
-        self.assertNotIn(b"OTP (simulation)", response.data)
+        self.assertNotIn(b"Login successful", response.data)
 
     def test_otp_required_before_dashboard_access(self):
         self.register_user()
@@ -99,6 +98,16 @@ class SecurityTestCase(unittest.TestCase):
             follow_redirects=True,
         )
         self.assertIn(b"contains unsupported characters", response.data)
+
+    def test_otp_retry_limit_enforced(self):
+        self.register_user()
+        self.login_password_step()
+        for _ in range(OTP_MAX_ATTEMPTS):
+            response = self.client.post("/verify-otp", data={"otp": "000000"}, follow_redirects=True)
+        self.assertIn(b"Incorrect OTP", response.data)
+
+        final_response = self.client.post("/verify-otp", data={"otp": "000000"}, follow_redirects=True)
+        self.assertIn(b"Too many OTP failures", final_response.data)
 
 
 if __name__ == "__main__":
