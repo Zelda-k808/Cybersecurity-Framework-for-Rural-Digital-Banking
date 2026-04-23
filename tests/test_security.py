@@ -71,6 +71,10 @@ class SecurityTestCase(unittest.TestCase):
         )
 
 
+    def complete_email_otp_step(self, email="test@example.com"):
+        otp_code = app.config.get("LAST_SENT_OTP", "000000")
+        return self.client.post("/verify-otp", data={"otp": otp_code}, follow_redirects=True)
+
     def complete_totp_step(self, email="test@example.com"):
         with app.app_context():
             db_path = app.config["DATABASE"]
@@ -86,6 +90,7 @@ class SecurityTestCase(unittest.TestCase):
     def full_login(self):
         self.create_user_directly()
         self.login_password_step()
+        self.complete_email_otp_step()
         return self.complete_totp_step()
 
     def test_bruteforce_lockout_after_multiple_failures(self):
@@ -137,6 +142,7 @@ class SecurityTestCase(unittest.TestCase):
     def test_totp_rejects_invalid_code(self):
         self.create_user_directly()
         self.login_password_step()
+        self.complete_email_otp_step()
         response = self.client.post("/verify-totp", data={"totp": "000000"}, follow_redirects=True)
         self.assertIn(b"Invalid TOTP code", response.data)
 

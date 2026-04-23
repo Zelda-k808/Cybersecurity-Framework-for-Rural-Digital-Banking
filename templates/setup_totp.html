@@ -10,8 +10,13 @@
         <strong>{{ lang_data.setup_totp_secret_label }}</strong><br>
         <code style="font-size:1.2rem; letter-spacing:0.1rem;">{{ secret }}</code>
     </p>
-    <div style="text-align:center; margin-top:1.5rem;">
-        <a class="btn" href="{{ url_for('login') }}">{{ lang_data.back_btn }}</a>
-    </div>
+    <hr style="margin:1.5rem 0;">
+    <form method="POST" style="text-align:center;">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+        <label for="totp" style="display:block; margin-bottom:0.5rem;">{{ lang_data.totp_label }}</label>
+        <input type="text" id="totp" name="totp" required pattern="\d{6}" maxlength="6" inputmode="numeric" autocomplete="one-time-code" style="max-width:200px; text-align:center; margin-bottom:1rem;" />
+        <br>
+        <button type="submit" class="btn">{{ lang_data.totp_verify_btn }}</button>
+    </form>
 </section>
 {% endblock %}

@@ -508,6 +508,9 @@ def get_pending_signup_by_email(email):
 
 def clear_pending_auth():
     session.pop("pending_user_email", None)
+    session.pop("pending_remember_me", None)
+    session.pop("email_otp_verified", None)
+    session.pop("setup_totp_secret", None)
 
 
 def send_otp(email, otp_code):
@@ -967,6 +970,82 @@ def login():
         session["pending_user_email"] = user.email
         session["pending_remember_me"] = remember_me
 
+        delivered = issue_otp_challenge(email, purpose="login")
+        if not delivered:
+            flash("OTP delivery failed. Please contact admin.", "danger")
+            return redirect(url_for("login"))
+
+        log_activity(user.id, "otp_issued", "Email OTP issued for login")
+        flash("An OTP has been sent to your registered email.", "info")
+        return redirect(url_for("verify_otp"))
+
+    return render_template("login.html")
+
+
+@app.route("/verify-otp", methods=["GET", "POST"])
+def verify_otp():
+    if current_user.is_authenticated:
+        return redirect(url_for("dashboard"))
+    email = session.get("pending_user_email")
+    if not email:
+        flash("Session expired. Please login again.", "warning")
+        return redirect(url_for("login"))
+
+    challenge = get_active_otp_challenge(email, purpose="login")
+    if not challenge:
+        session.pop("pending_user_email", None)
+        session.pop("pending_remember_me", None)
+        flash("OTP expired or invalid. Please request a new one.", "danger")
+        return redirect(url_for("login"))
+
+    if request.method == "POST":
+        submitted = request.form.get("otp", "").strip()
+        if not re.fullmatch(r"\d{6}", submitted):
+            flash("OTP must be a 6-digit code.", "danger")
+            return redirect(url_for("verify_otp"))
+
+        if datetime.now(timezone.utc) > datetime.fromisoformat(challenge["expires_at"]):
+            db = get_db()
+            db.execute("UPDATE otp_challenges SET consumed = 1 WHERE id = ?", (challenge["id"],))
+            db.commit()
+            session.pop("pending_user_email", None)
+            session.pop("pending_remember_me", None)
+            flash("OTP expired. Please request a new one.", "danger")
+            return redirect(url_for("login"))
+
+        if challenge["attempts"] >= OTP_MAX_ATTEMPTS:
+            db = get_db()
+            db.execute("UPDATE otp_challenges SET consumed = 1 WHERE id = ?", (challenge["id"],))
+            db.commit()
+            session.pop("pending_user_email", None)
+            session.pop("pending_remember_me", None)
+            flash("Too many OTP failures. Please request a new one.", "danger")
+            return redirect(url_for("login"))
+
+        if not bcrypt.check_password_hash(challenge["otp_hash"], submitted):
+            db = get_db()
+            db.execute(
+                "UPDATE otp_challenges SET attempts = attempts + 1 WHERE id = ?",
+                (challenge["id"],),
+            )
+            db.commit()
+            flash("Incorrect OTP.", "danger")
+            return redirect(url_for("verify_otp"))
+
+        # Email OTP verified — mark consumed and proceed to TOTP
+        db = get_db()
+        db.execute("UPDATE otp_challenges SET consumed = 1 WHERE id = ?", (challenge["id"],))
+        db.commit()
+
+        user = get_user_by_email(email)
+        if not user:
+            session.pop("pending_user_email", None)
+            session.pop("pending_remember_me", None)
+            flash("User not found. Please login again.", "danger")
+            return redirect(url_for("login"))
+
+        session["email_otp_verified"] = True
+
         if not user.totp_secret:
             # First-time TOTP setup
             secret = generate_totp_secret()
@@ -975,13 +1054,34 @@ def login():
             db.commit()
             session["setup_totp_secret"] = secret
             log_activity(user.id, "totp_setup_required", "TOTP secret generated for first-time setup")
-            flash("Two-factor authentication setup required.", "info")
+            flash("Email OTP verified. Two-factor authentication setup required.", "success")
             return redirect(url_for("setup_totp"))
 
-        log_activity(user.id, "totp_prompt", "TOTP verification required for login")
+        log_activity(user.id, "email_otp_verified", "Email OTP verified, proceeding to TOTP")
+        flash("Email OTP verified. Please enter your authenticator code.", "success")
         return redirect(url_for("verify_totp"))
 
-    return render_template("login.html")
+    return render_template("verify_otp.html", email=email)
+
+
+@app.route("/resend-otp")
+def resend_otp():
+    if current_user.is_authenticated:
+        return redirect(url_for("dashboard"))
+    email = session.get("pending_user_email")
+    if not email:
+        flash("Session expired. Please login again.", "warning")
+        return redirect(url_for("login"))
+    challenge = get_active_otp_challenge(email, purpose="login")
+    if challenge:
+        flash("An active OTP already exists. Please wait before requesting a new one.", "info")
+        return redirect(url_for("verify_otp"))
+    delivered = issue_otp_challenge(email, purpose="login")
+    if delivered:
+        flash("A new OTP has been sent to your email.", "info")
+    else:
+        flash("OTP delivery failed. Please contact admin.", "danger")
+    return redirect(url_for("verify_otp"))
 
 
 @app.route("/admin/requests")
@@ -1492,7 +1592,7 @@ def generate_totp_qr_code_base64(email, secret):
     return base64.b64encode(buffer.getvalue()).decode("utf-8")
 
 
-@app.route("/setup-totp")
+@app.route("/setup-totp", methods=["GET", "POST"])
 def setup_totp():
     if current_user.is_authenticated:
         return redirect(url_for("dashboard"))
@@ -1501,6 +1601,32 @@ def setup_totp():
     if not email or not secret:
         flash("Session expired. Please login again.", "warning")
         return redirect(url_for("login"))
+
+    if request.method == "POST":
+        submitted = request.form.get("totp", "").strip()
+        if not re.fullmatch(r"\d{6}", submitted):
+            flash("TOTP must be a 6-digit code.", "danger")
+            return redirect(url_for("setup_totp"))
+
+        totp = pyotp.TOTP(secret)
+        if not totp.verify(submitted, valid_window=1):
+            flash("Invalid TOTP code. Please try again.", "danger")
+            return redirect(url_for("setup_totp"))
+
+        # First TOTP verified — complete login
+        user = get_user_by_email(email)
+        if user:
+            login_user(user, remember=session.get("pending_remember_me", False))
+            session.pop("pending_remember_me", None)
+            session.pop("setup_totp_secret", None)
+            clear_pending_auth()
+            log_activity(user.id, "login_success", "User logged in after TOTP setup")
+            flash("Two-factor authentication configured successfully. Login complete.", "success")
+            return redirect(url_for("dashboard"))
+
+        flash("Session error. Please login again.", "danger")
+        return redirect(url_for("login"))
+
     qr_b64 = generate_totp_qr_code_base64(email, secret)
     return render_template("setup_totp.html", email=email, secret=secret, qr_code=qr_b64)
 
@@ -1513,6 +1639,10 @@ def verify_totp():
     if not email:
         flash("Session expired. Please login again.", "warning")
         return redirect(url_for("login"))
+
+    if not session.get("email_otp_verified"):
+        flash("Email OTP verification required first.", "warning")
+        return redirect(url_for("verify_otp"))
 
     user = get_user_by_email(email)
     if not user or not user.totp_secret:
