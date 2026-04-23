@@ -11,8 +11,9 @@ Build a secure, easy-to-use web banking platform for rural users that is resista
 ## Security Features
 
 ### Authentication & Session Management
-- **OTP-based 2FA** — email-delivered 6-digit OTP required on every login
-- **Bcrypt password hashing** — `Flask-Bcrypt`
+- **TOTP-based 2FA** — Google Authenticator / any TOTP app required on every login (QR code setup on first login)
+- **Argon2id password hashing** — OWASP 2024 recommended (`argon2-cffi`), with bcrypt fallback for migration
+- **Auto-rehash on login** — legacy bcrypt hashes are transparently upgraded to Argon2id after successful authentication
 - **Password policy** — minimum 8 chars, uppercase, lowercase, digit, and special character required
 - **Admin approval workflow** — new accounts are pending until an admin approves them
 - **Secure session cookies** — `Secure`, `HttpOnly`, `SameSite=Lax` enforced
@@ -54,7 +55,8 @@ Build a secure, easy-to-use web banking platform for rural users that is resista
 ### Logging & Audit
 - **`activity_logs` table** — all security events with timestamp, IP, user ID
 - **`transaction_logs` table** — separate tamper-resistant audit trail for every transfer
-- **`security.log`** and **`transactions.log`** — file-based logs (gitignored)
+- **`security.log`** with **log rotation** — 10 MB max, 5 backups via `RotatingFileHandler`
+- **`transactions.log`** — file-based logs (gitignored)
 - **Admin: security logs** — `/admin/logs`
 - **Admin: transaction audit logs** — `/admin/transaction-logs`
 
@@ -69,8 +71,8 @@ Build a secure, easy-to-use web banking platform for rural users that is resista
 | Admin rejects signup requests | `POST /admin/requests/<id>/reject` |
 | Admin manage users (activate/deactivate) | `GET /admin/users` |
 | Login with password | `POST /login` |
-| OTP verification | `POST /verify-otp` |
-| OTP resend | `POST /resend-otp` |
+| TOTP 2FA setup (first login) | `GET /setup-totp` |
+| TOTP 2FA verification | `GET/POST /verify-totp` |
 | Forgot password (OTP reset flow) | `GET/POST /forgot-password` |
 | Change password (logged-in) | `GET/POST /change-password` |
 | Dashboard (balance + account number) | `GET /dashboard` |
@@ -101,7 +103,7 @@ All 50+ UI strings translated including navigation, form labels, buttons, headin
 | Layer | Technology |
 |---|---|
 | Backend | Python 3.x, Flask 3.1.3 |
-| Auth | Flask-Login 0.6.3, Flask-Bcrypt 1.0.1, Flask-WTF 1.2.2 |
+| Auth | Flask-Login 0.6.3, Flask-Bcrypt 1.0.1, Flask-WTF 1.2.2, argon2-cffi (Argon2id) |
 | Database | SQLite (via `sqlite3`) |
 | Templates | Jinja2, HTML5, Vanilla CSS |
 | Deployment | uWSGI (Linux production), Flask dev server (Windows) |
