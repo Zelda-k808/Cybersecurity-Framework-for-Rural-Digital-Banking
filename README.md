@@ -20,6 +20,7 @@ Build a secure, easy-to-use web banking platform for rural users that is resista
 - **CSRF protection** — all POST forms protected via `Flask-WTF`
 - **OTP retry limit** — max 5 OTP attempts before session is cleared
 - **Brute-force lockout** — account locked for 15 minutes after 5 failed password attempts
+- **Per-IP rate limiting** — `/register` (5/hour) and `/login` (10/15 min)
 
 ### HTTP Security Headers (on every response)
 | Header | Value |
@@ -39,6 +40,7 @@ Build a secure, easy-to-use web banking platform for rural users that is resista
 
 ### Transfer Security
 - **Transfer confirmation step** — shows summary before executing; re-validates server-side on confirm
+- **Daily transfer limit** — ₹50,000 total per user per day
 - **11-digit account number system** — auto-generated unique account on approval
 - **Self-transfer prevention** — blocked at route level
 - **Atomic balance update** — debit sender and credit receiver in the same transaction
@@ -65,15 +67,18 @@ Build a secure, easy-to-use web banking platform for rural users that is resista
 | User registration (pending approval) | `POST /register` |
 | Admin approves signup requests | `GET/POST /admin/requests` |
 | Admin rejects signup requests | `POST /admin/requests/<id>/reject` |
+| Admin manage users (activate/deactivate) | `GET /admin/users` |
 | Login with password | `POST /login` |
 | OTP verification | `POST /verify-otp` |
 | OTP resend | `POST /resend-otp` |
+| Forgot password (OTP reset flow) | `GET/POST /forgot-password` |
+| Change password (logged-in) | `GET/POST /change-password` |
 | Dashboard (balance + account number) | `GET /dashboard` |
 | Money transfer (step 1 — validate) | `GET/POST /transfer` |
 | Money transfer (step 2 — confirm) | `GET/POST /transfer/confirm` |
-| Transaction history | `GET /history` |
-| Admin: security logs | `GET /admin/logs` |
-| Admin: transaction audit logs | `GET /admin/transaction-logs` |
+| Transaction history (paginated) | `GET /history` |
+| Admin: security logs (paginated) | `GET /admin/logs` |
+| Admin: transaction audit logs (paginated) | `GET /admin/transaction-logs` |
 | Language switcher | `GET /set-language/<lang>` |
 | Logout | `GET /logout` |
 
@@ -128,10 +133,15 @@ Cybersecurity-Framework-for-Rural-Digital-Banking/
 │   ├── dashboard.html
 │   ├── transfer.html
 │   ├── transfer_confirm.html       # Step 2 confirmation page
-│   ├── history.html
-│   ├── admin_logs.html
+│   ├── history.html                # Paginated
+│   ├── change_password.html
+│   ├── forgot_password.html
+│   ├── verify_reset_otp.html
+│   ├── reset_password.html
+│   ├── admin_logs.html             # Paginated
 │   ├── admin_requests.html         # Approve + Reject buttons
-│   └── admin_transaction_logs.html
+│   ├── admin_transaction_logs.html # Paginated
+│   └── admin_users.html            # Activate / Deactivate
 └── tests/
     └── test_security.py            # 11 automated pen-test cases
 ```
@@ -220,7 +230,8 @@ server {
 6. User enters OTP  →  session established (10-min inactivity timeout)
 7. User views dashboard (balance + account number)
 8. User fills transfer form  →  confirmation page shown
-9. User confirms  →  atomic debit/credit executed, audit logged
+9. User confirms  →  atomic debit/credit executed, daily limit checked, audit logged
+10. Admin can deactivate compromised accounts via /admin/users
 ```
 
 ---
@@ -246,6 +257,12 @@ python -m pytest tests/test_security.py -v
 | `test_transfer_input_sanitization_blocks_injection_patterns` | Input injection in transfer |
 | `test_transfer_to_own_account_is_rejected` | Self-transfer |
 | `test_transfer_with_insufficient_balance_is_rejected` | Overdraft / negative balance |
+| `test_rate_limit_register_blocks_flooding` | Mass signup flooding |
+| `test_rate_limit_login_blocks_flooding` | Mass login flooding |
+| `test_daily_transfer_limit_enforced` | Daily cap bypass |
+| `test_change_password_requires_current_password` | Password change without auth |
+| `test_forgot_password_flow_sends_otp` | Password reset flow |
+| `test_admin_can_toggle_user_active` | Account deactivation bypass |
 
 ---
 
@@ -266,3 +283,6 @@ python -m pytest tests/test_security.py -v
 | Page in iframe | Blocked — `X-Frame-Options: DENY` |
 | Idle for 10+ minutes | Auto-logged out |
 | Weak password (no special char) | Registration rejected |
+| Daily transfer > ₹50,000 | Rejected |
+| Mass registration from same IP | Rate-limited |
+| Admin deactivate user | Account locked, login blocked |
