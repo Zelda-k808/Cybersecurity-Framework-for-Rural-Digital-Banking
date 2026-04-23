@@ -5,6 +5,7 @@ venv/
 banking.db
 security.log
 transactions.log
+banking.db-journal
 
 # Dev secrets — never commit these
 run_dev.bat

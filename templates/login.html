@@ -1,34 +1,22 @@
 {% extends "base.html" %}
 {% block content %}
 <section class="card form-card">
-    <h2>{{ lang_data.login_heading }}</h2>
-    <form method="POST" autocomplete="off">
+    <h2>Login</h2>
+    <form method="POST">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+        <label>Email</label>
+        <input type="email" name="email" required />
 
-        <label>{{ lang_data.login_email }}</label>
-        <input
-            type="email"
-            name="email"
-            required
-            autocomplete="username"
-            spellcheck="false"
-        />
-
-        <label>{{ lang_data.login_password }}</label>
-        <input
-            type="password"
-            name="password"
-            required
-            autocomplete="current-password"
-        />
+        <label>Password</label>
+        <input type="password" name="password" required />
 
         <label>
             <input type="checkbox" name="remember_me" />
-            {{ lang_data.login_remember }}
+            Keep me signed in on this device
         </label>
 
-        <button type="submit" class="btn">{{ lang_data.login_btn }}</button>
+        <button type="submit" class="btn">Login and Send OTP</button>
     </form>
-    <p class="hint">{{ lang_data.login_hint }}</p>
+    <p class="hint">Only admin-approved accounts can login. OTP is delivered to your registered email.</p>
 </section>
 {% endblock %}

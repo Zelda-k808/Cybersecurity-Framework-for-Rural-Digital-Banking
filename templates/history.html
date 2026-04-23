@@ -1,17 +1,16 @@
 {% extends "base.html" %}
 {% block content %}
 <section class="card">
-    <h2>{{ lang_data.history_heading }}</h2>
+    <h2>Transaction History</h2>
     {% if transactions %}
         <table class="table">
             <thead>
                 <tr>
-                    <th>{{ lang_data.history_type }}</th>
-                    <th>{{ lang_data.history_amount }}</th>
-                    <th>{{ lang_data.history_receiver }}</th>
-                    <th>{{ lang_data.history_receiver_account }}</th>
-                    <th>{{ lang_data.history_note }}</th>
-                    <th>{{ lang_data.history_time }}</th>
+                    <th>Type</th>
+                    <th>Amount</th>
+                    <th>Receiver</th>
+                    <th>Note</th>
+                    <th>Time (UTC)</th>
                 </tr>
             </thead>
             <tbody>
@@ -20,7 +19,6 @@
                         <td>{{ t.txn_type }}</td>
                         <td>INR {{ "%.2f"|format(t.amount) }}</td>
                         <td>{{ t.receiver_name or "-" }}</td>
-                        <td>{{ t.receiver_account_number or "-" }}</td>
                         <td>{{ t.note or "-" }}</td>
                         <td>{{ t.created_at }}</td>
                     </tr>
@@ -28,7 +26,7 @@
             </tbody>
         </table>
     {% else %}
-        <p>{{ lang_data.history_empty }}</p>
+        <p>No transactions yet.</p>
     {% endif %}
 </section>
 {% endblock %}

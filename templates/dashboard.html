@@ -1,13 +1,12 @@
 {% extends "base.html" %}
 {% block content %}
 <section class="card">
-    <h2>{{ lang_data.dashboard_heading }}</h2>
-    <p><strong>{{ lang_data.dashboard_welcome }}:</strong> {{ current_user.full_name }}</p>
-    <p class="account-number">{{ lang_data.dashboard_account_no }}: <strong>{{ account_number }}</strong></p>
-    <p class="balance">{{ lang_data.dashboard_balance }}: INR {{ "%.2f"|format(balance) }}</p>
+    <h2>Dashboard</h2>
+    <p><strong>Welcome:</strong> {{ current_user.full_name }}</p>
+    <p class="balance">Available Balance: INR {{ "%.2f"|format(balance) }}</p>
     <div class="button-row">
-        <a class="btn" href="{{ url_for('transfer') }}">{{ lang_data.dashboard_send }}</a>
-        <a class="btn alt" href="{{ url_for('history') }}">{{ lang_data.dashboard_history }}</a>
+        <a class="btn" href="{{ url_for('transfer') }}">Send Money</a>
+        <a class="btn alt" href="{{ url_for('history') }}">View History</a>
     </div>
 </section>
 {% endblock %}

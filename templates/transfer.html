@@ -1,56 +1,19 @@
 {% extends "base.html" %}
 {% block content %}
 <section class="card form-card">
-    <h2>{{ lang_data.transfer_heading }}</h2>
-    <form method="POST" autocomplete="off">
+    <h2>Send Money</h2>
+    <form method="POST">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+        <label>Receiver Name</label>
+        <input type="text" name="receiver" required maxlength="80" />
 
-        <label>{{ lang_data.transfer_receiver }}</label>
-        <input
-            type="text"
-            name="receiver"
-            required
-            maxlength="80"
-            autocomplete="off"
-            spellcheck="false"
-        />
+        <label>Amount (INR)</label>
+        <input type="number" step="0.01" name="amount" required />
 
-        <label>{{ lang_data.transfer_receiver_account }}</label>
-        <input
-            type="text"
-            name="receiver_account"
-            required
-            minlength="11"
-            maxlength="11"
-            pattern="[0-9]{11}"
-            inputmode="numeric"
-            autocomplete="off"
-            autocorrect="off"
-            autocapitalize="off"
-            spellcheck="false"
-            placeholder="00000000000"
-        />
+        <label>Note (optional)</label>
+        <input type="text" name="note" maxlength="120" />
 
-        <label>{{ lang_data.transfer_amount }}</label>
-        <input
-            type="number"
-            step="0.01"
-            name="amount"
-            required
-            autocomplete="off"
-            inputmode="decimal"
-        />
-
-        <label>{{ lang_data.transfer_note }}</label>
-        <input
-            type="text"
-            name="note"
-            maxlength="120"
-            autocomplete="off"
-            spellcheck="false"
-        />
-
-        <button type="submit" class="btn">{{ lang_data.transfer_btn }}</button>
+        <button type="submit" class="btn">Submit Transfer</button>
     </form>
 </section>
 {% endblock %}

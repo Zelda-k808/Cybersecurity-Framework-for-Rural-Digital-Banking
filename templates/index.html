@@ -1,13 +1,13 @@
 {% extends "base.html" %}
 {% block content %}
 <section class="card">
-    <h2>{{ lang_data.index_welcome }}</h2>
-    <p>{{ lang_data.index_desc }}</p>
+    <h2>Welcome</h2>
+    <p>This project provides secure digital banking workflows with simple usability for rural users.</p>
     <ul>
-        <li>{{ lang_data.index_feat_otp }}</li>
-        <li>{{ lang_data.index_feat_hash }}</li>
-        <li>{{ lang_data.index_feat_lockout }}</li>
-        <li>{{ lang_data.index_feat_audit }}</li>
+        <li>OTP-based login with real verification</li>
+        <li>Password hashing with bcrypt</li>
+        <li>Login attempt monitoring and temporary lockouts</li>
+        <li>Transaction logging and activity audit trails</li>
     </ul>
     <div class="button-row">
         <a class="btn" href="{{ url_for('register') }}">{{ lang_data.register }}</a>
