@@ -1,15 +1,15 @@
 {% extends "base.html" %}
 {% block content %}
 <section class="card form-card">
-    <h2>Verify TOTP</h2>
-    <p class="hint">Enter the 6-digit code from your authenticator app.</p>
+    <h2>{{ lang_data.verify_totp_title }}</h2>
+    <p class="hint">{{ lang_data.verify_totp_hint }}</p>
     <form method="POST">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
 
-        <label for="totp">6-digit TOTP Code</label>
+        <label for="totp">{{ lang_data.totp_label }}</label>
         <input type="text" id="totp" name="totp" required pattern="\d{6}" maxlength="6" inputmode="numeric" autocomplete="one-time-code" />
 
-        <button type="submit" class="btn">Verify</button>
+        <button type="submit" class="btn">{{ lang_data.totp_verify_btn }}</button>
     </form>
 </section>
 {% endblock %}

@@ -491,7 +491,7 @@ def get_user_by_email(email):
     row = db.execute("SELECT * FROM users WHERE email = ?", (email,)).fetchone()
     if not row:
         return None
-    return User(row["id"], row["full_name"], row["email"], row["password_hash"], row["role"], row.get("totp_secret"))
+    return User(row["id"], row["full_name"], row["email"], row["password_hash"], row["role"], row["totp_secret"] if "totp_secret" in row.keys() else None)
 
 
 def get_pending_signup_by_email(email):
@@ -697,7 +697,7 @@ def load_user(user_id):
     row = db.execute("SELECT * FROM users WHERE id = ?", (user_id,)).fetchone()
     if not row:
         return None
-    return User(row["id"], row["full_name"], row["email"], row["password_hash"], row["role"], row.get("totp_secret"))
+    return User(row["id"], row["full_name"], row["email"], row["password_hash"], row["role"], row["totp_secret"] if "totp_secret" in row.keys() else None)
 
 
 def is_locked(email, ip_address):
@@ -984,116 +984,6 @@ def login():
     return render_template("login.html")
 
 
-@app.route("/verify-otp", methods=["GET", "POST"])
-def verify_otp():
-    if current_user.is_authenticated:
-        return redirect(url_for("dashboard"))
-    email = session.get("pending_user_email")
-
-    if not email:
-        flash("Session expired. Please login again.", "warning")
-        return redirect(url_for("login"))
-
-    challenge = get_active_otp_challenge(email)
-    if not challenge:
-        clear_pending_auth()
-        flash("No active OTP challenge found. Please login again.", "warning")
-        return redirect(url_for("login"))
-
-    if request.method == "POST":
-        submitted = request.form.get("otp", "").strip()
-        if not re.fullmatch(r"\d{6}", submitted):
-            flash("OTP must be a 6-digit code.", "danger")
-            return redirect(url_for("verify_otp"))
-
-        if datetime.now(timezone.utc) > datetime.fromisoformat(challenge["expires_at"]):
-            db = get_db()
-            db.execute("UPDATE otp_challenges SET consumed = 1 WHERE id = ?", (challenge["id"],))
-            db.commit()
-            clear_pending_auth()
-            flash("OTP expired. Login again.", "danger")
-            return redirect(url_for("login"))
-
-        if challenge["attempts"] >= OTP_MAX_ATTEMPTS:
-            db = get_db()
-            db.execute("UPDATE otp_challenges SET consumed = 1 WHERE id = ?", (challenge["id"],))
-            db.commit()
-            clear_pending_auth()
-            flash("Too many OTP failures. Login again.", "danger")
-            return redirect(url_for("login"))
-
-        if not bcrypt.check_password_hash(challenge["otp_hash"], submitted):
-            db = get_db()
-            db.execute(
-                "UPDATE otp_challenges SET attempts = attempts + 1 WHERE id = ?",
-                (challenge["id"],),
-            )
-            db.commit()
-            log_activity(None, "otp_failed", f"OTP verification failed for email={email}")
-            flash("Incorrect OTP.", "danger")
-            return redirect(url_for("verify_otp"))
-
-        user = get_user_by_email(email)
-        if not user:
-            flash("User not found.", "danger")
-            return redirect(url_for("login"))
-
-        db = get_db()
-        previous_login = db.execute(
-            """
-            SELECT ip_address FROM activity_logs
-            WHERE user_id = ? AND event_type = 'login_success'
-            ORDER BY created_at DESC
-            LIMIT 1
-            """,
-            (user.id,),
-        ).fetchone()
-        current_ip = get_client_ip()
-        if previous_login and previous_login["ip_address"] != current_ip:
-            log_activity(
-                user.id,
-                "anomaly_detected",
-                f"Login IP changed from {previous_login['ip_address']} to {current_ip}",
-            )
-            flash("Alert: Login detected from a new location/IP.", "warning")
-
-        db.execute("UPDATE otp_challenges SET consumed = 1 WHERE id = ?", (challenge["id"],))
-        db.commit()
-
-        login_user(user, remember=session.get("pending_remember_me", False))
-        session.pop("pending_remember_me", None)
-        clear_pending_auth()
-        log_activity(user.id, "login_success", "User logged in with OTP")
-        flash("Login successful.", "success")
-        return redirect(url_for("dashboard"))
-
-    return render_template("verify_otp.html", email=email)
-
-
-@app.route("/resend-otp", methods=["POST"])
-def resend_otp():
-    email = session.get("pending_user_email")
-    if not email:
-        flash("Login session expired. Please login again.", "warning")
-        return redirect(url_for("login"))
-
-    challenge = get_active_otp_challenge(email)
-    if challenge and datetime.now(timezone.utc) < datetime.fromisoformat(challenge["expires_at"]):
-        # Do not allow spamming OTP generation while one is still active.
-        flash("An OTP is already active. Please use it or wait until it expires.", "warning")
-        return redirect(url_for("verify_otp"))
-
-    delivered = issue_otp_challenge(email)
-    user = get_user_by_email(email)
-    if user:
-        log_activity(user.id, "otp_resent", "OTP re-issued for login")
-    if delivered:
-        flash("A new OTP has been sent.", "info")
-    else:
-        flash("OTP delivery failed. Please contact admin.", "danger")
-    return redirect(url_for("verify_otp"))
-
-
 @app.route("/admin/requests")
 @login_required
 def admin_requests():
@@ -1145,11 +1035,9 @@ def approve_signup_request(request_id):
 
     acc_num = generate_unique_account_number()
     totp_secret = generate_totp_secret()
-    # Re-hash with Argon2id if the stored hash is still bcrypt
+    # Keep original hash (bcrypt or Argon2id); verify_password handles bcrypt fallback
+    # and auto-rehash on first login will transparently upgrade to Argon2id
     stored_hash = signup_request["password_hash"]
-    if not stored_hash.startswith("$argon2"):
-        stored_hash = hash_password("dummy-for-rehash")  # placeholder; we don't have plaintext here
-    # NOTE: in production, users should be forced to reset password on first login after Argon2id migration
     db.execute(
         """
         INSERT INTO users (full_name, email, password_hash, role, account_number, totp_secret, created_at)
@@ -1158,7 +1046,7 @@ def approve_signup_request(request_id):
         (
             signup_request["full_name"],
             signup_request["email"],
-            signup_request["password_hash"],
+            stored_hash,
             acc_num,
             totp_secret,
             now_iso(),

@@ -3,7 +3,9 @@ import tempfile
 import unittest
 from datetime import datetime, timezone
 
-from app import OTP_MAX_ATTEMPTS, app, bcrypt, init_db
+import pyotp
+
+from app import OTP_MAX_ATTEMPTS, app, generate_totp_secret, hash_password, init_db
 
 
 class SecurityTestCase(unittest.TestCase):
@@ -23,7 +25,8 @@ class SecurityTestCase(unittest.TestCase):
         self.client = app.test_client()
 
     def create_user_directly(self, name="Test User", email="test@example.com", password="StrongPass123!", role="customer"):
-        password_hash = bcrypt.generate_password_hash(password).decode("utf-8")
+        password_hash = hash_password(password)
+        totp_secret = generate_totp_secret()
         import random
         account_number = str(random.randint(10_000_000_000, 99_999_999_999))
         with app.app_context():
@@ -32,10 +35,10 @@ class SecurityTestCase(unittest.TestCase):
             db = sqlite3.connect(db_path)
             db.execute(
                 """
-                INSERT INTO users (full_name, email, password_hash, role, account_number, created_at)
-                VALUES (?, ?, ?, ?, ?, ?)
+                INSERT INTO users (full_name, email, password_hash, role, account_number, totp_secret, created_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
                 """,
-                (name, email, password_hash, role, account_number, datetime.now(timezone.utc).isoformat()),
+                (name, email, password_hash, role, account_number, totp_secret, datetime.now(timezone.utc).isoformat()),
             )
             db.commit()
             db.close()
@@ -68,14 +71,22 @@ class SecurityTestCase(unittest.TestCase):
         )
 
 
-    def complete_otp_step(self):
-        otp = app.config.get("LAST_SENT_OTP")
-        return self.client.post("/verify-otp", data={"otp": otp}, follow_redirects=True)
+    def complete_totp_step(self, email="test@example.com"):
+        with app.app_context():
+            db_path = app.config["DATABASE"]
+            import sqlite3
+            db = sqlite3.connect(db_path)
+            db.row_factory = sqlite3.Row
+            row = db.execute("SELECT totp_secret FROM users WHERE email = ?", (email,)).fetchone()
+            db.close()
+            totp_secret = row["totp_secret"] if row else ""
+        totp_code = pyotp.TOTP(totp_secret).now()
+        return self.client.post("/verify-totp", data={"totp": totp_code}, follow_redirects=True)
 
     def full_login(self):
         self.create_user_directly()
         self.login_password_step()
-        return self.complete_otp_step()
+        return self.complete_totp_step()
 
     def test_bruteforce_lockout_after_multiple_failures(self):
         self.create_user_directly()
@@ -102,10 +113,11 @@ class SecurityTestCase(unittest.TestCase):
         self.assertIn(b"Invalid credentials", response.data)
         self.assertNotIn(b"Login successful", response.data)
 
-    def test_otp_required_before_dashboard_access(self):
+    def test_totp_required_before_dashboard_access(self):
         self.create_user_directly()
         self.login_password_step()
         response = self.client.get("/dashboard", follow_redirects=True)
+        # User is not authenticated until TOTP is verified, so dashboard redirects to login
         self.assertIn(b"Login", response.data)
         self.assertNotIn(b"Dashboard", response.data)
 
@@ -122,15 +134,11 @@ class SecurityTestCase(unittest.TestCase):
         )
         self.assertIn(b"contains unsupported characters", response.data)
 
-    def test_otp_retry_limit_enforced(self):
+    def test_totp_rejects_invalid_code(self):
         self.create_user_directly()
         self.login_password_step()
-        for _ in range(OTP_MAX_ATTEMPTS):
-            response = self.client.post("/verify-otp", data={"otp": "000000"}, follow_redirects=True)
-        self.assertIn(b"Incorrect OTP", response.data)
-
-        final_response = self.client.post("/verify-otp", data={"otp": "000000"}, follow_redirects=True)
-        self.assertIn(b"Too many OTP failures", final_response.data)
+        response = self.client.post("/verify-totp", data={"totp": "000000"}, follow_redirects=True)
+        self.assertIn(b"Invalid TOTP code", response.data)
 
     def test_signup_creates_pending_request_not_active_user(self):
         response = self.register_user()
