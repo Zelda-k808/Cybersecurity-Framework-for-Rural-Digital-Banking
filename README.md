@@ -1,197 +1,174 @@
-# Cybersecurity-Framework-for-Rural-Digital-Banking
+# Cybersecurity Framework for Rural Digital Banking
 
-A Cybersecurity-driven rural digital banking solution that combines secure system architecture, network monitoring, and penetration testing concepts to enable safe accessible financial services for underserved communities.
+A cybersecurity-driven rural digital banking web application that combines secure system architecture, network monitoring, and penetration testing concepts to enable safe, accessible financial services for underserved communities.
 
 ## Project Objective
 
-Build a simple web banking app for rural users that is easy to use and hard to attack.
+Build a secure, easy-to-use web banking platform for rural users that is resistant to modern cyber threats while remaining accessible to users with low digital literacy, unstable internet conditions, and high fraud/phishing exposure.
 
-The system is designed for:
-- low technical literacy users
-- unstable internet conditions
-- high fraud/phishing exposure
-- strong security with simple UI
+---
 
-## Core Modules Implemented
+## Security Features
 
-### A) Secure System Architecture
-- Frontend: HTML + CSS + Jinja templates (large buttons, clean screens)
-- Backend: Python Flask
-- Database: SQLite
-- Security controls:
-  - password hashing using `Flask-Bcrypt` (bcrypt)
-  - admin approval workflow for new account creation
-  - OTP-based second-factor login (email delivery)
-  - role-based authorization (`customer`, `admin`)
-  - session-based auth (`Flask-Login`)
-  - HTTPS-only secure session cookies (`Secure`, `HttpOnly`, `SameSite=Lax`)
-  - CSRF protection on all POST endpoints (`Flask-WTF` CSRF middleware)
-  - input validation and sanitization for transaction fields
+### Authentication & Session Management
+- **OTP-based 2FA** — email-delivered 6-digit OTP required on every login
+- **Bcrypt password hashing** — `Flask-Bcrypt` with cost factor 12
+- **Admin approval workflow** — new accounts are pending until an admin approves them
+- **Secure session cookies** — `Secure`, `HttpOnly`, `SameSite=Lax` enforced
+- **Remember-me cookie** — same protections applied
+- **CSRF protection** — all POST forms protected via `Flask-WTF`
+- **OTP retry limit** — max 5 OTP attempts before session is cleared
+- **Brute-force lockout** — account locked for 15 minutes after 5 failed password attempts
 
-### B) Network Monitoring / Suspicious Activity Detection
-- logs login and security activity with:
-  - timestamp
-  - IP address
-  - event type
-  - short description
-- detects and handles:
-  - repeated failed login attempts
-  - temporary lockout after 5 failures (15 minutes)
-  - unusual login IP changes (anomaly warning)
-- persistent records stored in `activity_logs` table
-- file logging in `security.log` for audit trail
+### UI / Client-Side Security
+- **Focus-loss blur shield** — full-screen blur overlay activates when the browser tab loses focus, protecting session from screen recording or shoulder surfing
+- **Password paste/copy/cut blocked** — JS event listeners prevent clipboard operations on all `password` fields site-wide (including dynamically added fields via `MutationObserver`)
+- **No browser autocomplete** on OTP, transfer, and account number fields
+- **`user-select: none`** on balance and account number display elements
 
-### C) Penetration Testing Scope (for evaluation)
-The app is built to demonstrate mitigation of:
-- SQL Injection:
-  - all DB operations use parameterized queries (`?` placeholders)
-- Brute-force login:
-  - login attempt tracking by email + IP
-  - auto lockout after threshold
-- Weak auth flow:
-  - password is never stored in plaintext
-  - OTP verification required before full login
-- Input abuse:
-  - transfer fields validated with strict regex and length checks
+### Back-Button & Cache Security
+- **Global `Cache-Control: no-store`** via `after_request` hook — every response is marked non-cacheable, so pressing Back after logout always hits the server fresh
+- **Auth-aware redirects** — `/login` and `/verify-otp` redirect authenticated users to dashboard instead of allowing back-navigation to those pages
 
-### D) Rural-Friendly Features
-- simple, high-contrast interface
-- large touch-friendly controls
-- multilingual switch:
-  - English (`EN`)
-  - Hindi (`HI`)
-  - Marathi (`MR`)
-- email OTP delivery with production-ready SMTP configuration
+### Transfer Security
+- **11-digit account number system** — every user gets a unique, auto-generated 11-digit account number on admin approval
+- **Strict receiver validation** — transfers require the exact 11-digit receiver account number (regex enforced server-side)
+- **Self-transfer prevention** — users cannot transfer money to their own account
+- **Atomic balance update** — sender is debited and receiver is credited in the same DB transaction
+
+### Input Validation
+- All text fields sanitized with regex — blocks SQL-like patterns (`;`, `'`, `"`, `--`), HTML/JS injection, and control characters
+- Parameterized queries used for all database operations (no string interpolation)
+- Length limits enforced on all inputs
+
+### Logging & Audit
+- **`activity_logs` table** — records all security events (login, failed auth, lockout, logout) with timestamp, IP, user ID
+- **`transaction_logs` table** — separate tamper-resistant audit trail for every money transfer (sender, receiver account, amount, note, IP)
+- **`security.log`** — file-based log for server-side audit (not committed to git)
+- **`transactions.log`** — file-based transaction audit log (not committed to git)
+
+---
 
 ## Functional Features
-- user registration request queue (pending until admin approval)
-- login with password + OTP verification
-- check account balance
-- money transfer with secure input validation and audit logging
-- transaction history
-- admin dashboard to approve signup requests
-- account approval email notification to user
-- admin-only security logs view (`/admin/logs`)
+
+| Feature | Route |
+|---|---|
+| User registration (pending approval) | `POST /register` |
+| Admin approves/views signup requests | `GET/POST /admin/requests` |
+| Login with password | `POST /login` |
+| OTP verification | `POST /verify-otp` |
+| OTP resend | `POST /resend-otp` |
+| Dashboard (balance + account number) | `GET /dashboard` |
+| Money transfer | `GET/POST /transfer` |
+| Transaction history | `GET /history` |
+| Admin: security activity logs | `GET /admin/logs` |
+| Admin: transaction audit logs | `GET /admin/transaction-logs` |
+| Language switcher | `GET /set-language/<lang>` |
+| Logout | `GET /logout` |
+
+---
+
+## Multilingual Support
+
+The entire UI supports three languages, switchable at runtime:
+
+| Code | Language | Script |
+|---|---|---|
+| `en` | English | Latin |
+| `hi` | हिन्दी (Hindi) | Devanagari |
+| `mr` | मराठी (Marathi) | Devanagari |
+
+Language preference is stored in the session. All 46 UI strings are translated, including navigation, form labels, buttons, headings, and empty-state messages. Language switcher buttons show native script names.
+
+---
 
 ## Tech Stack
-- Python 3.x
-- Flask
-- Flask-Login
-- Flask-Bcrypt
-- Flask-WTF
-- validators
-- SQLite
+
+| Layer | Technology |
+|---|---|
+| Backend | Python 3.x, Flask |
+| Auth | Flask-Login, Flask-Bcrypt, Flask-WTF |
+| Database | SQLite (via `sqlite3`) |
+| Templates | Jinja2, HTML5, Vanilla CSS |
+| Deployment | uWSGI (Linux), Flask dev server (Windows) |
+| Proxy | Werkzeug `ProxyFix` (Nginx-compatible) |
+
+---
 
 ## Project Structure
 
 ```text
 Cybersecurity-Framework-for-Rural-Digital-Banking/
-├── app.py
+├── app.py                        # Main Flask application
 ├── requirements.txt
-├── security.log                 # generated at runtime
-├── banking.db                   # generated at runtime
+├── uwsgi.ini                     # uWSGI production config
+├── .env                          # Local secrets (gitignored)
+├── banking.db                    # SQLite database (gitignored)
+├── security.log                  # Security event log (gitignored)
+├── transactions.log              # Transaction audit log (gitignored)
 ├── static/
 │   └── style.css
-└── templates/
-    ├── base.html
-    ├── admin_requests.html
-    ├── index.html
-    ├── register.html
-    ├── login.html
-    ├── verify_otp.html
-    ├── dashboard.html
-    ├── transfer.html
-    ├── history.html
-    └── admin_logs.html
+├── templates/
+│   ├── base.html                 # Layout, blur shield, security JS
+│   ├── index.html
+│   ├── login.html
+│   ├── register.html
+│   ├── verify_otp.html
+│   ├── dashboard.html
+│   ├── transfer.html
+│   ├── history.html
+│   ├── admin_logs.html
+│   ├── admin_requests.html
+│   └── admin_transaction_logs.html
+└── tests/
+    └── test_security.py          # Automated security test suite
 ```
+
+---
 
 ## Setup and Run
 
-1. Clone repository
-2. Create and activate virtual environment
-3. Install dependencies
-4. Run app with uWSGI
+### 1. Clone and install
 
 ```bash
+git clone https://github.com/Zelda-k808/Cybersecurity-Framework-for-Rural-Digital-Banking.git
+cd Cybersecurity-Framework-for-Rural-Digital-Banking
 pip install -r requirements.txt
-uwsgi --ini uwsgi.ini
 ```
 
-Then open: [http://127.0.0.1:8000](http://127.0.0.1:8000)
+### 2. Configure environment
 
-### Windows Development Fallback (Waitress)
+Create a `.env` file in the project root (it is gitignored):
 
-`uWSGI` is intended for Linux/Unix environments.  
-For local development/testing on Windows, run the same Flask app with `waitress`:
-
-```bash
-pip install waitress
-waitress-serve --listen=127.0.0.1:8000 app:app
-```
-
-### Production Preparation Script (Windows)
-
-To prepare dependencies before Linux production deployment, run:
-
-```bat
-deploy_production.bat
-```
-
-What this script does:
-- installs dependencies from `requirements.txt`
-- removes `waitress` (Windows dev fallback server), if present
-- keeps `Flask` installed because the application code depends on Flask
-
-### Linux Production Runtime (uWSGI)
-
-Use `uWSGI` for production deployment on Linux:
-
-```bash
-uwsgi --ini uwsgi.ini
-```
-
-Important: `uWSGI` replaces the development server, not the Flask framework.  
-So Flask must remain installed for `app:app` to run.
-
-### OTP Delivery Configuration (Email)
-
-Set these environment variables to enable actual OTP sending:
-
-```bash
+```env
+SECRET_KEY=your-long-random-secret-key
 SMTP_HOST=smtp.gmail.com
 SMTP_PORT=587
-SMTP_USERNAME=your_email@example.com
-SMTP_PASSWORD=your_app_password
-SMTP_FROM=your_email@example.com
+SMTP_USERNAME=your_email@gmail.com
+SMTP_PASSWORD=your-gmail-app-password
+SMTP_FROM=your_email@gmail.com
 SMTP_USE_TLS=1
 ```
 
-If SMTP is not configured, OTP delivery is blocked and login cannot proceed.
+> **Gmail App Password:** Go to [myaccount.google.com/apppasswords](https://myaccount.google.com/apppasswords), generate an App Password (requires 2-Step Verification enabled), and use that instead of your regular Gmail password.
 
-### Security Hardening Configuration
+### 3. Run (Windows / Development)
 
-The app enforces production-grade cookie and request protections:
+```bash
+python app.py
+```
 
-- `SESSION_COOKIE_SECURE=True`
-- `SESSION_COOKIE_HTTPONLY=True`
-- `SESSION_COOKIE_SAMESITE=Lax`
-- `REMEMBER_COOKIE_SECURE=True`
-- `REMEMBER_COOKIE_HTTPONLY=True`
-- `REMEMBER_COOKIE_SAMESITE=Lax`
-- CSRF tokens required for all POST forms via `Flask-WTF`
+Then open: [http://127.0.0.1:5000](http://127.0.0.1:5000)
 
-Important: because `Secure` cookies are enforced, deploy behind HTTPS in production.
+### 4. Run (Linux / Production)
 
-### Reverse Proxy Deployment (Nginx + TLS + ProxyFix)
+```bash
+uwsgi --ini uwsgi.ini
+```
 
-This project is ready to run behind Nginx with TLS termination.
+---
 
-1. Flask app already enables `ProxyFix` in `app.py` and trusts one upstream proxy hop.
-2. Keep `TRUST_REVERSE_PROXY=1` (default) in production.
-3. Run app with `uWSGI` on localhost.
-4. Let Nginx handle HTTPS and forward proxy headers.
-
-Example Nginx server block:
+## Reverse Proxy (Nginx + TLS)
 
 ```nginx
 server {
@@ -218,37 +195,54 @@ server {
 }
 ```
 
-Recommended app launch command behind Nginx:
+Keep `TRUST_REVERSE_PROXY=1` (default) when running behind Nginx.
 
-```bash
-uwsgi --ini uwsgi.ini
-```
+---
 
 ## Functional Flow
-1. User submits signup request
-2. Admin reviews pending requests in `Signup Requests` dashboard
-3. Admin approves request and system emails approval notification
-4. User logs in with email/password
-5. User completes OTP verification from email
-6. User views balance, transfers money, and checks history
 
-## Penetration Testing Demonstration Notes
+```
+1. User submits signup request  →  stored as pending
+2. Admin reviews /admin/requests  →  approves with one click
+3. System assigns unique 11-digit account number  →  sends approval email
+4. User logs in with email + password  →  OTP sent to registered email
+5. User enters OTP  →  session established
+6. User views dashboard (balance + account number)
+7. User transfers money using receiver's 11-digit account number
+8. Transfer debits sender, credits receiver, logs to transaction_logs
+```
 
-Use these checkpoints in your report/presentation:
+---
 
-1. **Brute force test**
-   - Attempt wrong password 5+ times
-   - Expected: temporary lockout response
+## Penetration Testing Checkpoints
 
-2. **SQL injection test**
-   - Try payloads in input fields such as `' OR 1=1 --`
-   - Expected: no unauthorized access due to parameterized queries and validation
+| Test | Expected Result |
+|---|---|
+| Wrong password × 5 | Account locked for 15 min |
+| Wrong password × 6+ | `Account temporarily locked` message |
+| SQL injection in login (`' OR 1=1 --`) | Rejected — parameterized queries |
+| XSS/injection in transfer fields | Rejected — regex sanitization |
+| Wrong OTP × 5 | OTP session cleared, must log in again |
+| Back button after logout | Redirected to login (no-store cache) |
+| Back button to OTP after login | Redirected to dashboard |
+| Paste into password field | Blocked by JS event listeners |
+| Tab away from banking session | Blur shield covers the screen |
+| Transfer to non-existent account | `Account not found` error |
+| Transfer to own account | `Cannot transfer to yourself` error |
+| Transfer more than balance | `Insufficient balance` error |
 
-3. **Weak password discussion**
-   - App enforces minimum length and hash storage
-   - No plaintext password in DB
+---
 
-4. **Suspicious login tracking**
-   - Observe `security.log` and activity logs for abnormal events
+## Automated Tests
 
+```bash
+python -m pytest tests/test_security.py -v
+```
 
+**6 tests cover:**
+- Brute-force lockout enforcement
+- SQL injection bypass attempt
+- OTP required before dashboard access
+- OTP retry limit enforcement
+- Transfer input sanitization
+- Signup creates pending request (not active user)
