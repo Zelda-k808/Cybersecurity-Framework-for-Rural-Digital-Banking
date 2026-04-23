@@ -9,7 +9,7 @@ from email.message import EmailMessage
 
 import validators
 from click import echo
-from flask import Flask, flash, g, redirect, render_template, request, session, url_for
+from flask import Flask, flash, g, redirect, render_template, request, send_from_directory, session, url_for
 from flask_bcrypt import Bcrypt
 from flask_login import (LoginManager, UserMixin, current_user, login_required,
                          login_user, logout_user)
@@ -61,6 +61,10 @@ LANG_CONTENT = {
         "admin_txn_logs_title": "Transaction Logs",
         "approve_btn": "Approve", "reject_btn": "Reject",
         "no_records": "No records found.", "back_btn": "Back",
+        "transfer_confirm_title": "Confirm Transfer",
+        "transfer_confirm_hint": "Please review the details carefully before confirming.",
+        "confirm_btn": "Confirm & Send",
+        "session_expired_msg": "Your session expired due to inactivity. Please log in again.",
     },
     "hi": {
         "app_title": "सुरक्षित ग्रामीण बैंकिंग",
@@ -88,6 +92,10 @@ LANG_CONTENT = {
         "admin_txn_logs_title": "लेनदेन लॉग",
         "approve_btn": "स्वीकृत करें", "reject_btn": "अस्वीकार करें",
         "no_records": "कोई रिकॉर्ड नहीं मिला।", "back_btn": "वापस",
+        "transfer_confirm_title": "स्थानांतरण की पुष्टि करें",
+        "transfer_confirm_hint": "पुष्टि करने से पहले विवरण ध्यानपूर्वक देखें।",
+        "confirm_btn": "पुष्टि करें और भेजें",
+        "session_expired_msg": "निष्क्रियता के कारण सत्र समाप्त हो गया। कृपया पुनः लॉग इन करें।",
     },
     "mr": {
         "app_title": "सुरक्षित ग्रामीण बँकिंग",
@@ -115,6 +123,10 @@ LANG_CONTENT = {
         "admin_txn_logs_title": "व्यवहार नोंदी",
         "approve_btn": "मंजूर करा", "reject_btn": "नाकारा",
         "no_records": "कोणतेही रेकॉर्ड सापडले नाहीत.", "back_btn": "मागे",
+        "transfer_confirm_title": "हस्तांतरण पुष्टी करा",
+        "transfer_confirm_hint": "पुष्टी करण्यापूर्वी तपशील काळजीपूर्वक पाहा.",
+        "confirm_btn": "पुष्टी करा आणि पाठवा",
+        "session_expired_msg": "निष्क्रियतेमुळे सत्र संपले. कृपया पुन्हा लॉग इन करा.",
     },
 }
 
@@ -297,6 +309,8 @@ def validate_password_strength(password):
         return "Password must include at least one lowercase letter."
     if not re.search(r"[0-9]", password):
         return "Password must include at least one digit."
+    if not re.search(r"[!@#$%^&*()_+\-=\[\]{}|;:,.<>?/]", password):
+        return "Password must include at least one special character (!@#$%^&* etc.)."
     return None
 
 
@@ -471,13 +485,14 @@ def create_admin_user(full_name, email, password):
         return False, "Admin already exists with this email."
 
     password_hash = bcrypt.generate_password_hash(password).decode("utf-8")
+    acc_num = generate_unique_account_number()
     db = get_db()
     db.execute(
         """
-        INSERT INTO users (full_name, email, password_hash, role, created_at)
-        VALUES (?, ?, ?, 'admin', ?)
+        INSERT INTO users (full_name, email, password_hash, role, account_number, created_at)
+        VALUES (?, ?, ?, 'admin', ?, ?)
         """,
-        (full_name, email, password_hash, now_iso()),
+        (full_name, email, password_hash, acc_num, now_iso()),
     )
     db.commit()
     return True, "Admin user created successfully."
@@ -565,17 +580,50 @@ def record_login_attempt(email, ip_address, success):
     return True, "Invalid credentials."
 
 
+SESSION_INACTIVITY_MINUTES = 10
+
+
 @app.before_request
 def boot():
     init_db()
+    # Session inactivity timeout — log out after 10 min of no activity
+    if current_user.is_authenticated:
+        last_active_str = session.get("last_active")
+        if last_active_str:
+            last_active = datetime.fromisoformat(last_active_str)
+            if datetime.now(timezone.utc) - last_active > timedelta(minutes=SESSION_INACTIVITY_MINUTES):
+                logout_user()
+                session.clear()
+                flash("Session expired due to inactivity. Please log in again.", "warning")
+                return redirect(url_for("login"))
+    if current_user.is_authenticated:
+        session["last_active"] = datetime.now(timezone.utc).isoformat()
 
 
 @app.after_request
 def set_security_headers(response):
-    """Prevent browsers from caching pages — stops back-button access after logout."""
+    """Enforce strict HTTP security headers on every response."""
+    # Cache control — prevent back-button access after logout
     response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
     response.headers["Pragma"] = "no-cache"
     response.headers["Expires"] = "0"
+    # Clickjacking protection
+    response.headers["X-Frame-Options"] = "DENY"
+    # MIME-sniffing protection
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    # Don't leak referrer to external sites
+    response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+    # Force HTTPS (only meaningful when behind HTTPS/Nginx)
+    response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
+    # Content Security Policy — restrict script/style sources
+    response.headers["Content-Security-Policy"] = (
+        "default-src 'self'; "
+        "script-src 'self' 'unsafe-inline'; "
+        "style-src 'self' 'unsafe-inline'; "
+        "img-src 'self' data:; "
+        "font-src 'self'; "
+        "frame-ancestors 'none';"
+    )
     return response
 
 
@@ -894,6 +942,47 @@ def approve_signup_request(request_id):
     return redirect(url_for("admin_requests"))
 
 
+@app.route("/admin/requests/<int:request_id>/reject", methods=["POST"])
+@login_required
+def reject_signup_request(request_id):
+    if current_user.role != "admin":
+        flash("Unauthorized. Admin access required.", "danger")
+        return redirect(url_for("dashboard"))
+
+    db = get_db()
+    signup_request = db.execute(
+        "SELECT * FROM signup_requests WHERE id = ? AND status = 'pending'",
+        (request_id,),
+    ).fetchone()
+    if not signup_request:
+        flash("Request not found or already reviewed.", "warning")
+        return redirect(url_for("admin_requests"))
+
+    db.execute(
+        """
+        UPDATE signup_requests
+        SET status = 'rejected', reviewed_by = ?, reviewed_at = ?
+        WHERE id = ?
+        """,
+        (current_user.id, now_iso(), request_id),
+    )
+    db.commit()
+    log_activity(current_user.id, "signup_rejected",
+                 f"Rejected signup for email={signup_request['email']}")
+    send_email_message(
+        signup_request["email"],
+        "Your account request was not approved",
+        (
+            f"Hello {signup_request['full_name']},\n\n"
+            "Unfortunately your account request could not be approved at this time.\n"
+            "Please contact the bank for further information.\n\n"
+            "Regards,\nAdmin Team"
+        ),
+    )
+    flash("Signup request rejected and user notified.", "info")
+    return redirect(url_for("admin_requests"))
+
+
 @app.route("/dashboard")
 @login_required
 def dashboard():
@@ -930,10 +1019,10 @@ def transfer():
 
         try:
             amount = float(amount_raw)
-            if amount <= 0:
+            if amount < 1:
                 raise ValueError
         except ValueError:
-            flash("Enter a valid transfer amount.", "danger")
+            flash("Enter a valid transfer amount (minimum INR 1).", "danger")
             return redirect(url_for("transfer"))
 
         db = get_db()
@@ -955,6 +1044,50 @@ def transfer():
             flash("Insufficient balance.", "danger")
             return redirect(url_for("transfer"))
 
+        # All checks passed — store in session and show confirmation page
+        session["pending_transfer"] = {
+            "receiver": receiver_name,
+            "receiver_account": receiver_account,
+            "amount": amount,
+            "note": note,
+        }
+        return redirect(url_for("transfer_confirm"))
+
+    return render_template("transfer.html")
+
+
+@app.route("/transfer/confirm", methods=["GET", "POST"])
+@login_required
+def transfer_confirm():
+    pending = session.get("pending_transfer")
+    if not pending:
+        flash("No pending transfer. Please fill in the transfer form.", "warning")
+        return redirect(url_for("transfer"))
+
+    if request.method == "POST":
+        # Re-validate everything server-side before executing
+        receiver_account = pending["receiver_account"]
+        receiver_name = pending["receiver"]
+        amount = pending["amount"]
+        note = pending.get("note", "")
+
+        db = get_db()
+        sender_row = db.execute("SELECT * FROM users WHERE id = ?", (current_user.id,)).fetchone()
+        receiver_row = db.execute(
+            "SELECT * FROM users WHERE account_number = ?", (receiver_account,)
+        ).fetchone()
+
+        if not receiver_row or (sender_row and sender_row["account_number"] == receiver_account):
+            session.pop("pending_transfer", None)
+            flash("Transfer could not be completed. Please try again.", "danger")
+            return redirect(url_for("transfer"))
+
+        current_balance = sender_row["balance"] if sender_row else 0
+        if amount > current_balance:
+            session.pop("pending_transfer", None)
+            flash("Insufficient balance.", "danger")
+            return redirect(url_for("transfer"))
+
         db.execute("UPDATE users SET balance = balance - ? WHERE id = ?", (amount, current_user.id))
         db.execute("UPDATE users SET balance = balance + ? WHERE account_number = ?",
                    (amount, receiver_account))
@@ -968,6 +1101,7 @@ def transfer():
         )
         txn_id = cursor.lastrowid
         db.commit()
+        session.pop("pending_transfer", None)
         log_transaction(txn_id, current_user.id, receiver_account, amount, note)
         log_activity(
             current_user.id, "transfer_success",
@@ -976,7 +1110,7 @@ def transfer():
         flash("Transfer successful.", "success")
         return redirect(url_for("history"))
 
-    return render_template("transfer.html")
+    return render_template("transfer_confirm.html", pending=pending)
 
 
 @app.route("/history")

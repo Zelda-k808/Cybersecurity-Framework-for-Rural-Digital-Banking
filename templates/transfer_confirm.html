@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="card form-card">
+    <h2>{{ lang_data.transfer_confirm_title }}</h2>
+    <p class="hint">{{ lang_data.transfer_confirm_hint }}</p>
+
+    <table class="table">
+        <tbody>
+            <tr><td><strong>{{ lang_data.receiver_name_label }}</strong></td><td>{{ pending.receiver }}</td></tr>
+            <tr><td><strong>{{ lang_data.receiver_account_label }}</strong></td><td class="mono">{{ pending.receiver_account }}</td></tr>
+            <tr><td><strong>{{ lang_data.amount_label }}</strong></td><td><strong>INR {{ "%.2f"|format(pending.amount) }}</strong></td></tr>
+            {% if pending.note %}
+            <tr><td><strong>{{ lang_data.note_label }}</strong></td><td>{{ pending.note }}</td></tr>
+            {% endif %}
+        </tbody>
+    </table>
+
+    <div class="button-row" style="margin-top:1.5rem;">
+        <form method="POST" action="{{ url_for('transfer_confirm') }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+            <button type="submit" class="btn" id="confirm-transfer-btn">{{ lang_data.confirm_btn }}</button>
+        </form>
+        <a class="btn alt" href="{{ url_for('transfer') }}">{{ lang_data.back_btn }}</a>
+    </div>
+</section>
+{% endblock %}

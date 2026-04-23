@@ -1,6 +1,8 @@
-Flask
-Flask-Login
-Flask-Bcrypt
-Flask-WTF
-uWSGI
-validators
+Flask==3.1.3
+Flask-Login==0.6.3
+Flask-Bcrypt==1.0.1
+Flask-WTF==1.2.2
+validators==0.35.0
+Werkzeug==3.1.8
+# uWSGI is Linux only — install separately on the production server
+# uWSGI==2.0.28

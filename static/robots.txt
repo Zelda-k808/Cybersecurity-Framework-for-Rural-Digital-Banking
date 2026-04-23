@@ -1,0 +1,10 @@
+User-agent: *
+Disallow: /login
+Disallow: /register
+Disallow: /dashboard
+Disallow: /transfer
+Disallow: /history
+Disallow: /admin/
+Disallow: /verify-otp
+Disallow: /set-language/
+Allow: /

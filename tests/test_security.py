@@ -22,7 +22,7 @@ class SecurityTestCase(unittest.TestCase):
 
         self.client = app.test_client()
 
-    def create_user_directly(self, name="Test User", email="test@example.com", password="StrongPass123", role="customer"):
+    def create_user_directly(self, name="Test User", email="test@example.com", password="StrongPass123!", role="customer"):
         password_hash = bcrypt.generate_password_hash(password).decode("utf-8")
         import random
         account_number = str(random.randint(10_000_000_000, 99_999_999_999))
@@ -46,7 +46,7 @@ class SecurityTestCase(unittest.TestCase):
         except FileNotFoundError:
             pass
 
-    def register_user(self, name="Test User", email="test@example.com", password="StrongPass123"):
+    def register_user(self, name="Test User", email="test@example.com", password="StrongPass123!"):
         return self.client.post(
             "/register",
             data={
@@ -57,7 +57,7 @@ class SecurityTestCase(unittest.TestCase):
             follow_redirects=True,
         )
 
-    def login_password_step(self, email="test@example.com", password="StrongPass123"):
+    def login_password_step(self, email="test@example.com", password="StrongPass123!"):
         return self.client.post(
             "/login",
             data={
@@ -66,6 +66,7 @@ class SecurityTestCase(unittest.TestCase):
             },
             follow_redirects=True,
         )
+
 
     def complete_otp_step(self):
         otp = app.config.get("LAST_SENT_OTP")

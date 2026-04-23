@@ -10,7 +10,7 @@
                     <th>Full Name</th>
                     <th>Email</th>
                     <th>Requested At (UTC)</th>
-                    <th>Action</th>
+                    <th>Actions</th>
                 </tr>
             </thead>
             <tbody>
@@ -21,10 +21,17 @@
                         <td>{{ req.email }}</td>
                         <td>{{ req.created_at }}</td>
                         <td>
-                            <form method="POST" action="{{ url_for('approve_signup_request', request_id=req.id) }}">
-                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
-                                <button type="submit" class="btn">{{ lang_data.approve_btn }}</button>
-                            </form>
+                            <div class="button-row" style="gap:.5rem;margin:0;">
+                                <form method="POST" action="{{ url_for('approve_signup_request', request_id=req.id) }}">
+                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+                                    <button type="submit" class="btn" style="padding:.4rem .9rem;font-size:.85rem;">{{ lang_data.approve_btn }}</button>
+                                </form>
+                                <form method="POST" action="{{ url_for('reject_signup_request', request_id=req.id) }}">
+                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+                                    <button type="submit" class="btn alt" style="padding:.4rem .9rem;font-size:.85rem;"
+                                            onclick="return confirm('Reject this signup request?')">{{ lang_data.reject_btn }}</button>
+                                </form>
+                            </div>
                         </td>
                     </tr>
                 {% endfor %}
