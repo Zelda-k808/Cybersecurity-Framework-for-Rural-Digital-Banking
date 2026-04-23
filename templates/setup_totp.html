@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="card form-card">
+    <h2>Two-Factor Authentication Setup</h2>
+    <p class="hint">Scan this QR code with Google Authenticator or any TOTP app, then return to login.</p>
+    <div style="text-align:center; margin:1.5rem 0;">
+        <img src="data:image/png;base64,{{ qr_code }}" alt="TOTP QR Code" style="max-width:240px;" />
+    </div>
+    <p class="hint" style="text-align:center;">
+        <strong>Or enter this secret manually:</strong><br>
+        <code style="font-size:1.2rem; letter-spacing:0.1rem;">{{ secret }}</code>
+    </p>
+    <div style="text-align:center; margin-top:1.5rem;">
+        <a class="btn" href="{{ url_for('login') }}">Back to Login</a>
+    </div>
+</section>
+{% endblock %}

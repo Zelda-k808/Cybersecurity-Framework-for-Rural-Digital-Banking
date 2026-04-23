@@ -4,5 +4,9 @@ Flask-Bcrypt==1.0.1
 Flask-WTF==1.2.2
 validators==0.35.0
 Werkzeug==3.1.8
+pyotp==2.9.0
+qrcode==7.4.2
+Pillow==10.3.0
+argon2-cffi==23.1.0
 # uWSGI is Linux only — install separately on the production server
 # uWSGI==2.0.28

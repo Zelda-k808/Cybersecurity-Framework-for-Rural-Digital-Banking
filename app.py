@@ -1,3 +1,5 @@
+import base64
+import io
 import logging
 import os
 import random
@@ -6,8 +8,13 @@ import sqlite3
 import smtplib
 from datetime import datetime, timedelta, timezone
 from email.message import EmailMessage
+from logging.handlers import RotatingFileHandler
 
+import pyotp
+import qrcode
 import validators
+from argon2 import PasswordHasher
+from argon2.exceptions import VerifyMismatchError
 from click import echo
 from flask import Flask, flash, g, redirect, render_template, request, send_from_directory, session, url_for
 from flask_bcrypt import Bcrypt
@@ -87,6 +94,13 @@ LANG_CONTENT = {
         "activate_btn": "Activate",
         "daily_limit_msg": "Daily transfer limit of INR 50,000 exceeded.",
         "prev_page": "« Previous", "next_page": "Next »", "page_label": "Page",
+        "setup_totp_title": "Two-Factor Authentication Setup",
+        "setup_totp_hint": "Scan this QR code with Google Authenticator or any TOTP app, then return to login.",
+        "setup_totp_secret_label": "Or enter this secret manually",
+        "verify_totp_title": "Verify TOTP",
+        "verify_totp_hint": "Enter the 6-digit code from your authenticator app.",
+        "totp_label": "6-digit TOTP Code",
+        "totp_verify_btn": "Verify",
     },
     "hi": {
         "app_title": "सुरक्षित ग्रामीण बैंकिंग",
@@ -137,6 +151,13 @@ LANG_CONTENT = {
         "activate_btn": "सक्रिय करें",
         "daily_limit_msg": "दैनिक स्थानांतरण सीमा INR 50,000 पार हो गई।",
         "prev_page": "« पिछला", "next_page": "अगला »", "page_label": "पृष्ठ",
+        "setup_totp_title": "दो-कारक प्रमाणीकरण सेटअप",
+        "setup_totp_hint": "Google Authenticator या किसी TOTP ऐप के साथ इस QR कोड को स्कैन करें, फिर लॉगिन पर वापस जाएं।",
+        "setup_totp_secret_label": "या इस गुप्त कोड को मैन्युअल रूप से दर्ज करें",
+        "verify_totp_title": "TOTP सत्यापित करें",
+        "verify_totp_hint": "अपने ऑथेंटिकेटर ऐप से 6-अंकीय कोड दर्ज करें।",
+        "totp_label": "6-अंकीय TOTP कोड",
+        "totp_verify_btn": "सत्यापित करें",
     },
     "mr": {
         "app_title": "सुरक्षित ग्रामीण बँकिंग",
@@ -186,7 +207,14 @@ LANG_CONTENT = {
         "deactivate_btn": "निष्क्रिय करा",
         "activate_btn": "सक्रिय करा",
         "daily_limit_msg": "दैनिक हस्तांतरण मर्यादा INR 50,000 पार झाली.",
-        "prev_page": "« मागे", "next_page": "पुढे »", "page_label": "पृष्ठ",
+        "prev_page": "« मागील", "next_page": "पुढे »", "page_label": "पृष्ठ",
+        "setup_totp_title": "दोन-घटक प्रमाणीकरण सेटअप",
+        "setup_totp_hint": "Google Authenticator किंवा कोणत्याही TOTP अ‍ॅपसह हा QR कोड स्कॅन करा, नंतर लॉगिनकडे परत जा.",
+        "setup_totp_secret_label": "किंवा हा गुप्त कोड स्वतःहून टाका",
+        "verify_totp_title": "TOTP सत्यापित करा",
+        "verify_totp_hint": "तुमच्या अ‍ॅथेंटिकेटर अ‍ॅपमधून 6-अंकी कोड टाका.",
+        "totp_label": "6-अंकी TOTP कोड",
+        "totp_verify_btn": "सत्यापित करा",
     },
 }
 
@@ -213,6 +241,8 @@ csrf = CSRFProtect(app)
 login_manager = LoginManager(app)
 login_manager.login_view = "login"
 
+_argon2_hasher = PasswordHasher(time_cost=2, memory_cost=65536, parallelism=1)
+
 if app.config["TRUST_REVERSE_PROXY"]:
     app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_port=1)
 
@@ -220,19 +250,46 @@ logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(message)s",
     handlers=[
-        logging.FileHandler(os.path.join(BASE_DIR, "security.log")),
+        RotatingFileHandler(
+            os.path.join(BASE_DIR, "security.log"),
+            maxBytes=10 * 1024 * 1024,
+            backupCount=5,
+        ),
         logging.StreamHandler(),
     ],
 )
 
 
 class User(UserMixin):
-    def __init__(self, user_id, full_name, email, password_hash, role):
+    def __init__(self, user_id, full_name, email, password_hash, role, totp_secret=None):
         self.id = str(user_id)
         self.full_name = full_name
         self.email = email
         self.password_hash = password_hash
         self.role = role
+        self.totp_secret = totp_secret
+
+
+def hash_password(password):
+    """Hash password using Argon2id (OWASP 2024 recommendation)."""
+    return _argon2_hasher.hash(password)
+
+
+def verify_password(password_hash, password):
+    """Verify password with Argon2id primary; fallback to bcrypt for migration."""
+    if password_hash.startswith("$argon2"):
+        try:
+            _argon2_hasher.verify(password_hash, password)
+            return True
+        except VerifyMismatchError:
+            return False
+    else:
+        # bcrypt fallback — caller should rehash after successful login
+        return bcrypt.check_password_hash(password_hash, password)
+
+
+def generate_totp_secret():
+    return pyotp.random_base32()
 
 
 def get_db():
@@ -261,6 +318,7 @@ def init_db():
             role TEXT NOT NULL DEFAULT 'customer',
             balance REAL NOT NULL DEFAULT 5000.00,
             account_number TEXT UNIQUE,
+            totp_secret TEXT,
             created_at TEXT NOT NULL
         );
 
@@ -345,6 +403,7 @@ def init_db():
         "ALTER TABLE users ADD COLUMN is_active INTEGER NOT NULL DEFAULT 1",
         "ALTER TABLE otp_challenges ADD COLUMN purpose TEXT DEFAULT 'login'",
         "CREATE TABLE IF NOT EXISTS rate_limits (id INTEGER PRIMARY KEY AUTOINCREMENT, ip_address TEXT NOT NULL, endpoint TEXT NOT NULL, window_start TEXT NOT NULL, count INTEGER NOT NULL DEFAULT 1)",
+        "ALTER TABLE users ADD COLUMN totp_secret TEXT",
     ]:
         try:
             db.execute(migration_sql)
@@ -432,7 +491,7 @@ def get_user_by_email(email):
     row = db.execute("SELECT * FROM users WHERE email = ?", (email,)).fetchone()
     if not row:
         return None
-    return User(row["id"], row["full_name"], row["email"], row["password_hash"], row["role"])
+    return User(row["id"], row["full_name"], row["email"], row["password_hash"], row["role"], row.get("totp_secret"))
 
 
 def get_pending_signup_by_email(email):
@@ -602,15 +661,16 @@ def create_admin_user(full_name, email, password):
     if existing:
         return False, "Admin already exists with this email."
 
-    password_hash = bcrypt.generate_password_hash(password).decode("utf-8")
+    password_hash = hash_password(password)
     acc_num = generate_unique_account_number()
+    totp_secret = generate_totp_secret()
     db = get_db()
     db.execute(
         """
-        INSERT INTO users (full_name, email, password_hash, role, account_number, created_at)
-        VALUES (?, ?, ?, 'admin', ?, ?)
+        INSERT INTO users (full_name, email, password_hash, role, account_number, totp_secret, created_at)
+        VALUES (?, ?, ?, 'admin', ?, ?, ?)
         """,
-        (full_name, email, password_hash, acc_num, now_iso()),
+        (full_name, email, password_hash, acc_num, totp_secret, now_iso()),
     )
     db.commit()
     return True, "Admin user created successfully."
@@ -637,7 +697,7 @@ def load_user(user_id):
     row = db.execute("SELECT * FROM users WHERE id = ?", (user_id,)).fetchone()
     if not row:
         return None
-    return User(row["id"], row["full_name"], row["email"], row["password_hash"], row["role"])
+    return User(row["id"], row["full_name"], row["email"], row["password_hash"], row["role"], row.get("totp_secret"))
 
 
 def is_locked(email, ip_address):
@@ -829,7 +889,7 @@ def register():
             flash("Email already has an account or pending request.", "warning")
             return redirect(url_for("register"))
 
-        password_hash = bcrypt.generate_password_hash(password).decode("utf-8")
+        password_hash = hash_password(password)
         db = get_db()
         db.execute(
             """
@@ -885,7 +945,7 @@ def login():
                 flash("Your account has been deactivated. Please contact the bank.", "danger")
                 return redirect(url_for("login"))
 
-        if not user or not bcrypt.check_password_hash(user.password_hash, password):
+        if not user or not verify_password(user.password_hash, password):
             clear_pending_auth()
             can_stay, message = record_login_attempt(email, ip, success=False)
             log_activity(None, "auth_failed", f"Failed login for email={email}")
@@ -895,19 +955,31 @@ def login():
             return redirect(url_for("login"))
 
         record_login_attempt(email, ip, success=True)
+
+        # Rehash bcrypt passwords with Argon2id on successful login
+        if not user.password_hash.startswith("$argon2"):
+            new_hash = hash_password(password)
+            db = get_db()
+            db.execute("UPDATE users SET password_hash = ? WHERE id = ?", (new_hash, user.id))
+            db.commit()
+            user.password_hash = new_hash
+
         session["pending_user_email"] = user.email
         session["pending_remember_me"] = remember_me
 
-        delivered = issue_otp_challenge(user.email)
-        log_activity(user.id, "otp_generated", "OTP generated for second-factor login")
-        if delivered:
-            flash("OTP sent to your registered email.", "info")
-        else:
-            clear_pending_auth()
-            session.pop("pending_remember_me", None)
-            flash("OTP delivery failed. Please contact admin.", "danger")
-            return redirect(url_for("login"))
-        return redirect(url_for("verify_otp"))
+        if not user.totp_secret:
+            # First-time TOTP setup
+            secret = generate_totp_secret()
+            db = get_db()
+            db.execute("UPDATE users SET totp_secret = ? WHERE id = ?", (secret, user.id))
+            db.commit()
+            session["setup_totp_secret"] = secret
+            log_activity(user.id, "totp_setup_required", "TOTP secret generated for first-time setup")
+            flash("Two-factor authentication setup required.", "info")
+            return redirect(url_for("setup_totp"))
+
+        log_activity(user.id, "totp_prompt", "TOTP verification required for login")
+        return redirect(url_for("verify_totp"))
 
     return render_template("login.html")
 
@@ -1072,16 +1144,23 @@ def approve_signup_request(request_id):
         return redirect(url_for("admin_requests"))
 
     acc_num = generate_unique_account_number()
+    totp_secret = generate_totp_secret()
+    # Re-hash with Argon2id if the stored hash is still bcrypt
+    stored_hash = signup_request["password_hash"]
+    if not stored_hash.startswith("$argon2"):
+        stored_hash = hash_password("dummy-for-rehash")  # placeholder; we don't have plaintext here
+    # NOTE: in production, users should be forced to reset password on first login after Argon2id migration
     db.execute(
         """
-        INSERT INTO users (full_name, email, password_hash, role, account_number, created_at)
-        VALUES (?, ?, ?, 'customer', ?, ?)
+        INSERT INTO users (full_name, email, password_hash, role, account_number, totp_secret, created_at)
+        VALUES (?, ?, ?, 'customer', ?, ?, ?)
         """,
         (
             signup_request["full_name"],
             signup_request["email"],
             signup_request["password_hash"],
             acc_num,
+            totp_secret,
             now_iso(),
         ),
     )
@@ -1380,7 +1459,7 @@ def change_password():
         new_password = request.form.get("new_password", "")
         confirm_password = request.form.get("confirm_password", "")
 
-        if not bcrypt.check_password_hash(current_user.password_hash, current_password):
+        if not verify_password(current_user.password_hash, current_password):
             flash("Current password is incorrect.", "danger")
             return redirect(url_for("change_password"))
 
@@ -1393,7 +1472,7 @@ def change_password():
             flash(error, "danger")
             return redirect(url_for("change_password"))
 
-        new_hash = bcrypt.generate_password_hash(new_password).decode("utf-8")
+        new_hash = hash_password(new_password)
         db = get_db()
         db.execute("UPDATE users SET password_hash = ? WHERE id = ?", (new_hash, current_user.id))
         db.commit()
@@ -1504,7 +1583,7 @@ def reset_password():
         if error:
             flash(error, "danger")
             return redirect(url_for("reset_password"))
-        new_hash = bcrypt.generate_password_hash(new_password).decode("utf-8")
+        new_hash = hash_password(new_password)
         db = get_db()
         db.execute("UPDATE users SET password_hash = ? WHERE email = ?", (new_hash, email))
         db.commit()
@@ -1515,6 +1594,83 @@ def reset_password():
         return redirect(url_for("login"))
 
     return render_template("reset_password.html")
+
+
+def generate_totp_qr_code_base64(email, secret):
+    uri = pyotp.totp.TOTP(secret).provisioning_uri(name=email, issuer_name="Rural Banking")
+    img = qrcode.make(uri)
+    buffer = io.BytesIO()
+    img.save(buffer, format="PNG")
+    return base64.b64encode(buffer.getvalue()).decode("utf-8")
+
+
+@app.route("/setup-totp")
+def setup_totp():
+    if current_user.is_authenticated:
+        return redirect(url_for("dashboard"))
+    email = session.get("pending_user_email")
+    secret = session.get("setup_totp_secret")
+    if not email or not secret:
+        flash("Session expired. Please login again.", "warning")
+        return redirect(url_for("login"))
+    qr_b64 = generate_totp_qr_code_base64(email, secret)
+    return render_template("setup_totp.html", email=email, secret=secret, qr_code=qr_b64)
+
+
+@app.route("/verify-totp", methods=["GET", "POST"])
+def verify_totp():
+    if current_user.is_authenticated:
+        return redirect(url_for("dashboard"))
+    email = session.get("pending_user_email")
+    if not email:
+        flash("Session expired. Please login again.", "warning")
+        return redirect(url_for("login"))
+
+    user = get_user_by_email(email)
+    if not user or not user.totp_secret:
+        clear_pending_auth()
+        flash("Two-factor setup required. Please login again.", "warning")
+        return redirect(url_for("login"))
+
+    if request.method == "POST":
+        submitted = request.form.get("totp", "").strip()
+        if not re.fullmatch(r"\d{6}", submitted):
+            flash("TOTP must be a 6-digit code.", "danger")
+            return redirect(url_for("verify_totp"))
+
+        totp = pyotp.TOTP(user.totp_secret)
+        if not totp.verify(submitted, valid_window=1):
+            log_activity(user.id, "totp_failed", f"TOTP verification failed for email={email}")
+            flash("Invalid TOTP code. Please try again.", "danger")
+            return redirect(url_for("verify_totp"))
+
+        # TOTP verified — complete login
+        previous_login = get_db().execute(
+            """
+            SELECT ip_address FROM activity_logs
+            WHERE user_id = ? AND event_type = 'login_success'
+            ORDER BY created_at DESC
+            LIMIT 1
+            """,
+            (user.id,),
+        ).fetchone()
+        current_ip = get_client_ip()
+        if previous_login and previous_login["ip_address"] != current_ip:
+            log_activity(
+                user.id,
+                "anomaly_detected",
+                f"Login IP changed from {previous_login['ip_address']} to {current_ip}",
+            )
+            flash("Alert: Login detected from a new location/IP.", "warning")
+
+        login_user(user, remember=session.get("pending_remember_me", False))
+        session.pop("pending_remember_me", None)
+        clear_pending_auth()
+        log_activity(user.id, "login_success", "User logged in with TOTP")
+        flash("Login successful.", "success")
+        return redirect(url_for("dashboard"))
+
+    return render_template("verify_totp.html", email=email)
 
 
 @app.route("/admin/users")
