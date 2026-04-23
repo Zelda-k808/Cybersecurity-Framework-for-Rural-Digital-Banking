@@ -43,8 +43,11 @@
             <a href="{{ url_for('history') }}">{{ lang_data.nav_history }}</a>
             {% if current_user.role == "admin" %}
                 <a href="{{ url_for('admin_requests') }}">{{ lang_data.nav_signup_requests }}</a>
+                <a href="{{ url_for('admin_users') }}">{{ lang_data.nav_admin_users }}</a>
                 <a href="{{ url_for('admin_logs') }}">{{ lang_data.nav_security_logs }}</a>
                 <a href="{{ url_for('admin_transaction_logs') }}">{{ lang_data.nav_transaction_logs }}</a>
+            {% else %}
+                <a href="{{ url_for('change_password') }}">{{ lang_data.nav_change_password }}</a>
             {% endif %}
             <a href="{{ url_for('logout') }}">{{ lang_data.nav_logout }}</a>
         {% else %}

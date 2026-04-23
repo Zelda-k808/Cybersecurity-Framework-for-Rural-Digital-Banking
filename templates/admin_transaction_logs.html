@@ -32,5 +32,16 @@
     {% else %}
         <p class="hint">{{ lang_data.no_records }}</p>
     {% endif %}
+    {% if total_pages > 1 %}
+    <div class="pagination" style="margin-top:1rem; display:flex; justify-content:center; gap:1rem;">
+        {% if page > 1 %}
+            <a class="btn alt" href="{{ url_for('admin_transaction_logs', page=page-1) }}">{{ lang_data.prev_page }}</a>
+        {% endif %}
+        <span class="hint">{{ lang_data.page_label }} {{ page }} / {{ total_pages }}</span>
+        {% if page < total_pages %}
+            <a class="btn alt" href="{{ url_for('admin_transaction_logs', page=page+1) }}">{{ lang_data.next_page }}</a>
+        {% endif %}
+    </div>
+    {% endif %}
 </section>
 {% endblock %}

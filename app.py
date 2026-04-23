@@ -33,6 +33,9 @@ MAX_FAILED_ATTEMPTS = 5
 LOCK_MINUTES = 15
 OTP_EXPIRY_MINUTES = 5
 OTP_MAX_ATTEMPTS = 5
+DAILY_TRANSFER_LIMIT = 50_000.00   # INR — max total transfer per user per day
+REGISTER_RATE_LIMIT = 5            # max signups from same IP per hour
+PAGE_SIZE = 20                     # rows per page in history / admin logs
 
 LANG_CONTENT = {
     "en": {
@@ -42,6 +45,7 @@ LANG_CONTENT = {
         "nav_home": "Home", "nav_dashboard": "Dashboard", "nav_transfer": "Transfer",
         "nav_history": "History", "nav_signup_requests": "Signup Requests",
         "nav_security_logs": "Security Logs", "nav_transaction_logs": "Transaction Logs",
+        "nav_change_password": "Change Password", "nav_admin_users": "Manage Users",
         "nav_logout": "Logout", "register": "Register", "login": "Login",
         "register_title": "Create Account", "full_name_label": "Full Name",
         "email_label": "Email", "password_label": "Password",
@@ -65,6 +69,24 @@ LANG_CONTENT = {
         "transfer_confirm_hint": "Please review the details carefully before confirming.",
         "confirm_btn": "Confirm & Send",
         "session_expired_msg": "Your session expired due to inactivity. Please log in again.",
+        "change_password_title": "Change Password",
+        "current_password_label": "Current Password",
+        "new_password_label": "New Password",
+        "confirm_password_label": "Confirm New Password",
+        "change_password_btn": "Update Password",
+        "forgot_password_link": "Forgot Password?",
+        "forgot_password_title": "Reset Password",
+        "forgot_password_hint": "Enter your registered email to receive a reset OTP.",
+        "forgot_password_btn": "Send Reset OTP",
+        "reset_password_title": "Set New Password",
+        "reset_password_btn": "Reset Password",
+        "verify_reset_title": "Enter Reset OTP",
+        "verify_reset_btn": "Verify OTP",
+        "admin_users_title": "Manage Users",
+        "deactivate_btn": "Deactivate",
+        "activate_btn": "Activate",
+        "daily_limit_msg": "Daily transfer limit of INR 50,000 exceeded.",
+        "prev_page": "« Previous", "next_page": "Next »", "page_label": "Page",
     },
     "hi": {
         "app_title": "सुरक्षित ग्रामीण बैंकिंग",
@@ -73,6 +95,7 @@ LANG_CONTENT = {
         "nav_home": "होम", "nav_dashboard": "डैशबोर्ड", "nav_transfer": "ट्रांसफर",
         "nav_history": "इतिहास", "nav_signup_requests": "पंजीकरण अनुरोध",
         "nav_security_logs": "सुरक्षा लॉग", "nav_transaction_logs": "लेनदेन लॉग",
+        "nav_change_password": "पासवर्ड बदलें", "nav_admin_users": "उपयोगकर्ता प्रबंधन",
         "nav_logout": "लॉगआउट", "register": "रजिस्टर करें", "login": "लॉगिन करें",
         "register_title": "खाता बनाएँ", "full_name_label": "पूरा नाम",
         "email_label": "ईमेल", "password_label": "पासवर्ड",
@@ -96,6 +119,24 @@ LANG_CONTENT = {
         "transfer_confirm_hint": "पुष्टि करने से पहले विवरण ध्यानपूर्वक देखें।",
         "confirm_btn": "पुष्टि करें और भेजें",
         "session_expired_msg": "निष्क्रियता के कारण सत्र समाप्त हो गया। कृपया पुनः लॉग इन करें।",
+        "change_password_title": "पासवर्ड बदलें",
+        "current_password_label": "वर्तमान पासवर्ड",
+        "new_password_label": "नया पासवर्ड",
+        "confirm_password_label": "नया पासवर्ड पुष्टि करें",
+        "change_password_btn": "पासवर्ड अपडेट करें",
+        "forgot_password_link": "पासवर्ड भूल गए?",
+        "forgot_password_title": "पासवर्ड रीसेट करें",
+        "forgot_password_hint": "रीसेट OTP प्राप्त करने के लिए अपना पंजीकृत ईमेल दर्ज करें।",
+        "forgot_password_btn": "रीसेट OTP भेजें",
+        "reset_password_title": "नया पासवर्ड सेट करें",
+        "reset_password_btn": "पासवर्ड रीसेट करें",
+        "verify_reset_title": "रीसेट OTP दर्ज करें",
+        "verify_reset_btn": "OTP सत्यापित करें",
+        "admin_users_title": "उपयोगकर्ता प्रबंधन",
+        "deactivate_btn": "निष्क्रिय करें",
+        "activate_btn": "सक्रिय करें",
+        "daily_limit_msg": "दैनिक स्थानांतरण सीमा INR 50,000 पार हो गई।",
+        "prev_page": "« पिछला", "next_page": "अगला »", "page_label": "पृष्ठ",
     },
     "mr": {
         "app_title": "सुरक्षित ग्रामीण बँकिंग",
@@ -104,6 +145,7 @@ LANG_CONTENT = {
         "nav_home": "मुख्यपृष्ठ", "nav_dashboard": "डॅशबोर्ड", "nav_transfer": "हस्तांतरण",
         "nav_history": "इतिहास", "nav_signup_requests": "नोंदणी विनंत्या",
         "nav_security_logs": "सुरक्षा नोंदी", "nav_transaction_logs": "व्यवहार नोंदी",
+        "nav_change_password": "पासवर्ड बदल", "nav_admin_users": "वापरकर्ते व्यवस्थापन",
         "nav_logout": "लॉगआउट", "register": "नोंदणी करा", "login": "लॉगिन करा",
         "register_title": "खाते तयार करा", "full_name_label": "पूर्ण नाव",
         "email_label": "ईमेल", "password_label": "पासवर्ड",
@@ -127,6 +169,24 @@ LANG_CONTENT = {
         "transfer_confirm_hint": "पुष्टी करण्यापूर्वी तपशील काळजीपूर्वक पाहा.",
         "confirm_btn": "पुष्टी करा आणि पाठवा",
         "session_expired_msg": "निष्क्रियतेमुळे सत्र संपले. कृपया पुन्हा लॉग इन करा.",
+        "change_password_title": "पासवर्ड बदल",
+        "current_password_label": "वर्तमान पासवर्ड",
+        "new_password_label": "नवीन पासवर्ड",
+        "confirm_password_label": "नवीन पासवर्ड पुष्टी करा",
+        "change_password_btn": "पासवर्ड अपडेट करा",
+        "forgot_password_link": "पासवर्ड विसरलात?",
+        "forgot_password_title": "पासवर्ड रीसेट करा",
+        "forgot_password_hint": "रीसेट OTP मिळवण्यासाठी तुमचे नोंदणीकृत ईमेल टाका.",
+        "forgot_password_btn": "रीसेट OTP पाठवा",
+        "reset_password_title": "नवीन पासवर्ड सेट करा",
+        "reset_password_btn": "पासवर्ड रीसेट करा",
+        "verify_reset_title": "रीसेट OTP टाका",
+        "verify_reset_btn": "OTP सत्यापित करा",
+        "admin_users_title": "वापरकर्ते व्यवस्थापन",
+        "deactivate_btn": "निष्क्रिय करा",
+        "activate_btn": "सक्रिय करा",
+        "daily_limit_msg": "दैनिक हस्तांतरण मर्यादा INR 50,000 पार झाली.",
+        "prev_page": "« मागे", "next_page": "पुढे »", "page_label": "पृष्ठ",
     },
 }
 
@@ -241,7 +301,16 @@ def init_db():
             expires_at TEXT NOT NULL,
             attempts INTEGER NOT NULL DEFAULT 0,
             consumed INTEGER NOT NULL DEFAULT 0,
+            purpose TEXT DEFAULT 'login',
             created_at TEXT NOT NULL
+        );
+
+        CREATE TABLE IF NOT EXISTS rate_limits (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            ip_address TEXT NOT NULL,
+            endpoint TEXT NOT NULL,
+            window_start TEXT NOT NULL,
+            count INTEGER NOT NULL DEFAULT 1
         );
 
         CREATE TABLE IF NOT EXISTS signup_requests (
@@ -273,6 +342,9 @@ def init_db():
     for migration_sql in [
         "ALTER TABLE users ADD COLUMN account_number TEXT UNIQUE",
         "ALTER TABLE transactions ADD COLUMN receiver_account_number TEXT",
+        "ALTER TABLE users ADD COLUMN is_active INTEGER NOT NULL DEFAULT 1",
+        "ALTER TABLE otp_challenges ADD COLUMN purpose TEXT DEFAULT 'login'",
+        "CREATE TABLE IF NOT EXISTS rate_limits (id INTEGER PRIMARY KEY AUTOINCREMENT, ip_address TEXT NOT NULL, endpoint TEXT NOT NULL, window_start TEXT NOT NULL, count INTEGER NOT NULL DEFAULT 1)",
     ]:
         try:
             db.execute(migration_sql)
@@ -441,24 +513,39 @@ def send_email_message(to_email, subject, body):
         return False
 
 
-def issue_otp_challenge(email):
+def issue_otp_challenge(email, purpose="login"):
     otp_code = f"{random.randint(100000, 999999)}"
-    delivered = send_otp(email, otp_code)
+    subject = "Your Rural Banking OTP"
+    if purpose == "reset":
+        subject = "Your Rural Banking Password Reset OTP"
+    message_body = (
+        f"Your one-time password is {otp_code}. It expires in {OTP_EXPIRY_MINUTES} minutes."
+    )
+    if purpose == "reset":
+        message_body = (
+            f"Your password reset OTP is {otp_code}. It expires in {OTP_EXPIRY_MINUTES} minutes. "
+            "If you did not request this, please contact admin immediately."
+        )
+    delivered = send_otp_email(email, otp_code, subject, message_body)
     if not delivered:
         return False
 
     otp_hash = bcrypt.generate_password_hash(otp_code).decode("utf-8")
     db = get_db()
-    db.execute("DELETE FROM otp_challenges WHERE email = ? AND consumed = 0", (email,))
+    db.execute(
+        "DELETE FROM otp_challenges WHERE email = ? AND consumed = 0 AND purpose = ?",
+        (email, purpose),
+    )
     db.execute(
         """
-        INSERT INTO otp_challenges (email, otp_hash, expires_at, attempts, consumed, created_at)
-        VALUES (?, ?, ?, 0, 0, ?)
+        INSERT INTO otp_challenges (email, otp_hash, expires_at, attempts, consumed, purpose, created_at)
+        VALUES (?, ?, ?, 0, 0, ?, ?)
         """,
         (
             email,
             otp_hash,
             (datetime.now(timezone.utc) + timedelta(minutes=OTP_EXPIRY_MINUTES)).isoformat(),
+            purpose,
             now_iso(),
         ),
     )
@@ -466,16 +553,47 @@ def issue_otp_challenge(email):
     return True
 
 
-def get_active_otp_challenge(email):
+def send_otp_email(email, otp_code, subject, body):
+    if app.config.get("TESTING"):
+        app.config["LAST_SENT_OTP"] = otp_code
+        return True
+
+    smtp_host = app.config.get("SMTP_HOST")
+    smtp_username = app.config.get("SMTP_USERNAME")
+    smtp_password = app.config.get("SMTP_PASSWORD")
+
+    if not smtp_host or not smtp_username or not smtp_password:
+        logging.error("SMTP not configured. OTP delivery failed for %s", email)
+        return False
+
+    message = EmailMessage()
+    message["Subject"] = subject
+    message["From"] = app.config.get("SMTP_FROM")
+    message["To"] = email
+    message.set_content(body)
+
+    try:
+        with smtplib.SMTP(smtp_host, app.config.get("SMTP_PORT")) as server:
+            if app.config.get("SMTP_USE_TLS"):
+                server.starttls()
+            server.login(smtp_username, smtp_password)
+            server.send_message(message)
+        return True
+    except Exception as exc:  # noqa: BLE001
+        logging.error("Failed to send OTP email to %s: %s", email, exc)
+        return False
+
+
+def get_active_otp_challenge(email, purpose="login"):
     db = get_db()
     return db.execute(
         """
         SELECT * FROM otp_challenges
-        WHERE email = ? AND consumed = 0
+        WHERE email = ? AND consumed = 0 AND purpose = ?
         ORDER BY created_at DESC
         LIMIT 1
         """,
-        (email,),
+        (email, purpose),
     ).fetchone()
 
 
@@ -580,6 +698,40 @@ def record_login_attempt(email, ip_address, success):
     return True, "Invalid credentials."
 
 
+def check_rate_limit(ip_address, endpoint, limit, window_minutes):
+    """Return True if request should be blocked."""
+    db = get_db()
+    window_start = (datetime.now(timezone.utc) - timedelta(minutes=window_minutes)).isoformat()
+    row = db.execute(
+        "SELECT SUM(count) as total FROM rate_limits WHERE ip_address = ? AND endpoint = ? AND window_start > ?",
+        (ip_address, endpoint, window_start),
+    ).fetchone()
+    if row and row["total"] and row["total"] >= limit:
+        return True
+    return False
+
+
+def record_rate_limit(ip_address, endpoint):
+    db = get_db()
+    window_start = datetime.now(timezone.utc).isoformat()
+    db.execute(
+        "INSERT INTO rate_limits (ip_address, endpoint, window_start, count) VALUES (?, ?, ?, 1)",
+        (ip_address, endpoint, window_start),
+    )
+    db.commit()
+
+
+def get_daily_transfer_total(user_id):
+    """Return sum of today's debit transactions for the user."""
+    db = get_db()
+    today_start = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0).isoformat()
+    row = db.execute(
+        "SELECT COALESCE(SUM(amount), 0) as total FROM transactions WHERE user_id = ? AND txn_type = 'debit' AND created_at >= ?",
+        (user_id, today_start),
+    ).fetchone()
+    return row["total"] if row else 0.0
+
+
 SESSION_INACTIVITY_MINUTES = 10
 
 
@@ -654,6 +806,11 @@ def home():
 @app.route("/register", methods=["GET", "POST"])
 def register():
     if request.method == "POST":
+        ip = get_client_ip()
+        if check_rate_limit(ip, "register", REGISTER_RATE_LIMIT, 60):
+            flash("Too many signup attempts from this network. Please try again later.", "warning")
+            return redirect(url_for("register"))
+        record_rate_limit(ip, "register")
         full_name = request.form.get("full_name", "").strip()
         email = request.form.get("email", "").strip().lower()
         password = request.form.get("password", "")
@@ -699,6 +856,11 @@ def login():
         ip = get_client_ip()
         remember_me = request.form.get("remember_me") == "on"
 
+        if check_rate_limit(ip, "login", 10, 15):
+            flash("Too many login attempts from this network. Please wait 15 minutes.", "warning")
+            return redirect(url_for("login"))
+        record_rate_limit(ip, "login")
+
         if not validators.email(email):
             flash("Enter a valid email address.", "danger")
             return redirect(url_for("login"))
@@ -713,6 +875,15 @@ def login():
             log_activity(None, "auth_lockout", f"Lockout for email={email}")
             flash(lock_message, "danger")
             return redirect(url_for("login"))
+
+        # Check if account is deactivated
+        if user:
+            db = get_db()
+            row = db.execute("SELECT is_active FROM users WHERE id = ?", (user.id,)).fetchone()
+            if row and row["is_active"] == 0:
+                log_activity(user.id, "auth_blocked", f"Login attempt on deactivated account email={email}")
+                flash("Your account has been deactivated. Please contact the bank.", "danger")
+                return redirect(url_for("login"))
 
         if not user or not bcrypt.check_password_hash(user.password_hash, password):
             clear_pending_auth()
@@ -1088,6 +1259,12 @@ def transfer_confirm():
             flash("Insufficient balance.", "danger")
             return redirect(url_for("transfer"))
 
+        daily_total = get_daily_transfer_total(current_user.id)
+        if daily_total + amount > DAILY_TRANSFER_LIMIT:
+            session.pop("pending_transfer", None)
+            flash("Daily transfer limit of INR 50,000 exceeded.", "danger")
+            return redirect(url_for("transfer"))
+
         db.execute("UPDATE users SET balance = balance - ? WHERE id = ?", (amount, current_user.id))
         db.execute("UPDATE users SET balance = balance + ? WHERE account_number = ?",
                    (amount, receiver_account))
@@ -1116,17 +1293,27 @@ def transfer_confirm():
 @app.route("/history")
 @login_required
 def history():
+    page = request.args.get("page", 1, type=int)
+    if page < 1:
+        page = 1
+    offset = (page - 1) * PAGE_SIZE
     db = get_db()
+    total_row = db.execute(
+        "SELECT COUNT(*) as total FROM transactions WHERE user_id = ?", (current_user.id,)
+    ).fetchone()
+    total = total_row["total"] if total_row else 0
+    total_pages = (total + PAGE_SIZE - 1) // PAGE_SIZE if total else 1
     rows = db.execute(
         """
         SELECT txn_type, amount, receiver_name, receiver_account_number, note, created_at
         FROM transactions
         WHERE user_id = ?
         ORDER BY created_at DESC
+        LIMIT ? OFFSET ?
         """,
-        (current_user.id,),
+        (current_user.id, PAGE_SIZE, offset),
     ).fetchall()
-    return render_template("history.html", transactions=rows)
+    return render_template("history.html", transactions=rows, page=page, total_pages=total_pages)
 
 
 @app.route("/admin/logs")
@@ -1136,16 +1323,24 @@ def admin_logs():
         flash("Unauthorized. Admin access required.", "danger")
         return redirect(url_for("dashboard"))
 
+    page = request.args.get("page", 1, type=int)
+    if page < 1:
+        page = 1
+    offset = (page - 1) * PAGE_SIZE
     db = get_db()
+    total_row = db.execute("SELECT COUNT(*) as total FROM activity_logs").fetchone()
+    total = total_row["total"] if total_row else 0
+    total_pages = (total + PAGE_SIZE - 1) // PAGE_SIZE if total else 1
     rows = db.execute(
         """
         SELECT user_id, event_type, ip_address, description, created_at
         FROM activity_logs
         ORDER BY created_at DESC
-        LIMIT 100
-        """
+        LIMIT ? OFFSET ?
+        """,
+        (PAGE_SIZE, offset),
     ).fetchall()
-    return render_template("admin_logs.html", logs=rows)
+    return render_template("admin_logs.html", logs=rows, page=page, total_pages=total_pages)
 
 
 @app.route("/admin/transaction-logs")
@@ -1155,7 +1350,14 @@ def admin_transaction_logs():
         flash("Unauthorized. Admin access required.", "danger")
         return redirect(url_for("dashboard"))
 
+    page = request.args.get("page", 1, type=int)
+    if page < 1:
+        page = 1
+    offset = (page - 1) * PAGE_SIZE
     db = get_db()
+    total_row = db.execute("SELECT COUNT(*) as total FROM transaction_logs").fetchone()
+    total = total_row["total"] if total_row else 0
+    total_pages = (total + PAGE_SIZE - 1) // PAGE_SIZE if total else 1
     rows = db.execute(
         """
         SELECT tl.id, u.full_name AS sender_name, tl.receiver_account_number,
@@ -1163,10 +1365,189 @@ def admin_transaction_logs():
         FROM transaction_logs tl
         LEFT JOIN users u ON tl.sender_id = u.id
         ORDER BY tl.created_at DESC
-        LIMIT 200
-        """
+        LIMIT ? OFFSET ?
+        """,
+        (PAGE_SIZE, offset),
     ).fetchall()
-    return render_template("admin_transaction_logs.html", logs=rows)
+    return render_template("admin_transaction_logs.html", logs=rows, page=page, total_pages=total_pages)
+
+
+@app.route("/change-password", methods=["GET", "POST"])
+@login_required
+def change_password():
+    if request.method == "POST":
+        current_password = request.form.get("current_password", "")
+        new_password = request.form.get("new_password", "")
+        confirm_password = request.form.get("confirm_password", "")
+
+        if not bcrypt.check_password_hash(current_user.password_hash, current_password):
+            flash("Current password is incorrect.", "danger")
+            return redirect(url_for("change_password"))
+
+        if new_password != confirm_password:
+            flash("New password and confirmation do not match.", "danger")
+            return redirect(url_for("change_password"))
+
+        error = validate_password_strength(new_password)
+        if error:
+            flash(error, "danger")
+            return redirect(url_for("change_password"))
+
+        new_hash = bcrypt.generate_password_hash(new_password).decode("utf-8")
+        db = get_db()
+        db.execute("UPDATE users SET password_hash = ? WHERE id = ?", (new_hash, current_user.id))
+        db.commit()
+        log_activity(current_user.id, "password_changed", "User changed their password")
+        flash("Password updated successfully.", "success")
+        return redirect(url_for("dashboard"))
+
+    return render_template("change_password.html")
+
+
+@app.route("/forgot-password", methods=["GET", "POST"])
+def forgot_password():
+    if current_user.is_authenticated:
+        return redirect(url_for("dashboard"))
+    if request.method == "POST":
+        email = request.form.get("email", "").strip().lower()
+        if not validators.email(email):
+            flash("Enter a valid email address.", "danger")
+            return redirect(url_for("forgot_password"))
+        user = get_user_by_email(email)
+        if not user:
+            # Don't reveal whether email exists
+            flash("If this email is registered, a reset OTP has been sent.", "info")
+            return redirect(url_for("login"))
+        delivered = issue_otp_challenge(email, purpose="reset")
+        if delivered:
+            session["reset_email"] = email
+            flash("OTP sent to your registered email.", "info")
+            return redirect(url_for("verify_reset_otp"))
+        flash("OTP delivery failed. Please contact admin.", "danger")
+        return redirect(url_for("login"))
+    return render_template("forgot_password.html")
+
+
+@app.route("/verify-reset-otp", methods=["GET", "POST"])
+def verify_reset_otp():
+    if current_user.is_authenticated:
+        return redirect(url_for("dashboard"))
+    email = session.get("reset_email")
+    if not email:
+        flash("Session expired. Please start again.", "warning")
+        return redirect(url_for("forgot_password"))
+    challenge = get_active_otp_challenge(email, purpose="reset")
+    if not challenge:
+        session.pop("reset_email", None)
+        flash("OTP expired or invalid. Please request a new one.", "danger")
+        return redirect(url_for("forgot_password"))
+
+    if request.method == "POST":
+        submitted = request.form.get("otp", "").strip()
+        if not re.fullmatch(r"\d{6}", submitted):
+            flash("OTP must be a 6-digit code.", "danger")
+            return redirect(url_for("verify_reset_otp"))
+
+        if datetime.now(timezone.utc) > datetime.fromisoformat(challenge["expires_at"]):
+            db = get_db()
+            db.execute("UPDATE otp_challenges SET consumed = 1 WHERE id = ?", (challenge["id"],))
+            db.commit()
+            session.pop("reset_email", None)
+            flash("OTP expired. Please request a new one.", "danger")
+            return redirect(url_for("forgot_password"))
+
+        if challenge["attempts"] >= OTP_MAX_ATTEMPTS:
+            db = get_db()
+            db.execute("UPDATE otp_challenges SET consumed = 1 WHERE id = ?", (challenge["id"],))
+            db.commit()
+            session.pop("reset_email", None)
+            flash("Too many OTP failures. Please request a new one.", "danger")
+            return redirect(url_for("forgot_password"))
+
+        if not bcrypt.check_password_hash(challenge["otp_hash"], submitted):
+            db = get_db()
+            db.execute(
+                "UPDATE otp_challenges SET attempts = attempts + 1 WHERE id = ?",
+                (challenge["id"],),
+            )
+            db.commit()
+            flash("Incorrect OTP.", "danger")
+            return redirect(url_for("verify_reset_otp"))
+
+        db = get_db()
+        db.execute("UPDATE otp_challenges SET consumed = 1 WHERE id = ?", (challenge["id"],))
+        db.commit()
+        session["reset_verified"] = True
+        flash("OTP verified. Set your new password.", "success")
+        return redirect(url_for("reset_password"))
+
+    return render_template("verify_reset_otp.html", email=email)
+
+
+@app.route("/reset-password", methods=["GET", "POST"])
+def reset_password():
+    if current_user.is_authenticated:
+        return redirect(url_for("dashboard"))
+    email = session.get("reset_email")
+    verified = session.get("reset_verified")
+    if not email or not verified:
+        flash("Session expired. Please start again.", "warning")
+        return redirect(url_for("forgot_password"))
+
+    if request.method == "POST":
+        new_password = request.form.get("new_password", "")
+        confirm_password = request.form.get("confirm_password", "")
+        if new_password != confirm_password:
+            flash("Passwords do not match.", "danger")
+            return redirect(url_for("reset_password"))
+        error = validate_password_strength(new_password)
+        if error:
+            flash(error, "danger")
+            return redirect(url_for("reset_password"))
+        new_hash = bcrypt.generate_password_hash(new_password).decode("utf-8")
+        db = get_db()
+        db.execute("UPDATE users SET password_hash = ? WHERE email = ?", (new_hash, email))
+        db.commit()
+        log_activity(None, "password_reset", f"Password reset completed for email={email}")
+        session.pop("reset_email", None)
+        session.pop("reset_verified", None)
+        flash("Password reset successful. Please log in with your new password.", "success")
+        return redirect(url_for("login"))
+
+    return render_template("reset_password.html")
+
+
+@app.route("/admin/users")
+@login_required
+def admin_users():
+    if current_user.role != "admin":
+        flash("Unauthorized. Admin access required.", "danger")
+        return redirect(url_for("dashboard"))
+    db = get_db()
+    users = db.execute(
+        "SELECT id, full_name, email, role, is_active, created_at FROM users ORDER BY created_at DESC"
+    ).fetchall()
+    return render_template("admin_users.html", users=users)
+
+
+@app.route("/admin/users/<int:user_id>/toggle-active", methods=["POST"])
+@login_required
+def toggle_user_active(user_id):
+    if current_user.role != "admin":
+        flash("Unauthorized. Admin access required.", "danger")
+        return redirect(url_for("dashboard"))
+    db = get_db()
+    row = db.execute("SELECT is_active, email FROM users WHERE id = ?", (user_id,)).fetchone()
+    if not row:
+        flash("User not found.", "warning")
+        return redirect(url_for("admin_users"))
+    new_state = 0 if row["is_active"] == 1 else 1
+    db.execute("UPDATE users SET is_active = ? WHERE id = ?", (new_state, user_id))
+    db.commit()
+    action = "deactivated" if new_state == 0 else "activated"
+    log_activity(current_user.id, f"user_{action}", f"Admin {action} user_id={user_id} email={row['email']}")
+    flash(f"User {action} successfully.", "success")
+    return redirect(url_for("admin_users"))
 
 
 @app.route("/logout")

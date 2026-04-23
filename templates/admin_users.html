@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="card">
+    <h2>{{ lang_data.admin_users_title }}</h2>
+    {% if users %}
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Full Name</th>
+                    <th>Email</th>
+                    <th>Role</th>
+                    <th>Status</th>
+                    <th>Created (UTC)</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for u in users %}
+                    <tr>
+                        <td>{{ u.id }}</td>
+                        <td>{{ u.full_name }}</td>
+                        <td>{{ u.email }}</td>
+                        <td>{{ u.role }}</td>
+                        <td>{% if u.is_active %}Active{% else %}Inactive{% endif %}</td>
+                        <td>{{ u.created_at }}</td>
+                        <td>
+                            {% if u.role != "admin" %}
+                                <form method="POST" action="{{ url_for('toggle_user_active', user_id=u.id) }}" style="display:inline;">
+                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+                                    {% if u.is_active %}
+                                        <button type="submit" class="btn alt" style="padding:.4rem .9rem;font-size:.85rem;"
+                                                onclick="return confirm('Deactivate this user?')">{{ lang_data.deactivate_btn }}</button>
+                                    {% else %}
+                                        <button type="submit" class="btn" style="padding:.4rem .9rem;font-size:.85rem;"
+                                                onclick="return confirm('Activate this user?')">{{ lang_data.activate_btn }}</button>
+                                    {% endif %}
+                                </form>
+                            {% else %}
+                                <span class="hint">Admin</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    {% else %}
+        <p class="hint">{{ lang_data.no_records }}</p>
+    {% endif %}
+</section>
+{% endblock %}

@@ -12,40 +12,49 @@ Build a secure, easy-to-use web banking platform for rural users that is resista
 
 ### Authentication & Session Management
 - **OTP-based 2FA** — email-delivered 6-digit OTP required on every login
-- **Bcrypt password hashing** — `Flask-Bcrypt` with cost factor 12
+- **Bcrypt password hashing** — `Flask-Bcrypt`
+- **Password policy** — minimum 8 chars, uppercase, lowercase, digit, and special character required
 - **Admin approval workflow** — new accounts are pending until an admin approves them
 - **Secure session cookies** — `Secure`, `HttpOnly`, `SameSite=Lax` enforced
-- **Remember-me cookie** — same protections applied
+- **Session inactivity timeout** — auto-logout after **10 minutes** of no activity
 - **CSRF protection** — all POST forms protected via `Flask-WTF`
 - **OTP retry limit** — max 5 OTP attempts before session is cleared
 - **Brute-force lockout** — account locked for 15 minutes after 5 failed password attempts
 
-### UI / Client-Side Security
-- **Focus-loss blur shield** — full-screen blur overlay activates when the browser tab loses focus, protecting session from screen recording or shoulder surfing
-- **Password paste/copy/cut blocked** — JS event listeners prevent clipboard operations on all `password` fields site-wide (including dynamically added fields via `MutationObserver`)
-- **No browser autocomplete** on OTP, transfer, and account number fields
-- **`user-select: none`** on balance and account number display elements
+### HTTP Security Headers (on every response)
+| Header | Value |
+|---|---|
+| `Cache-Control` | `no-store, no-cache, must-revalidate` |
+| `X-Frame-Options` | `DENY` (clickjacking protection) |
+| `X-Content-Type-Options` | `nosniff` (MIME-sniffing protection) |
+| `Referrer-Policy` | `strict-origin-when-cross-origin` |
+| `Strict-Transport-Security` | `max-age=31536000; includeSubDomains` |
+| `Content-Security-Policy` | Restricts scripts, styles, fonts to `'self'` |
 
-### Back-Button & Cache Security
-- **Global `Cache-Control: no-store`** via `after_request` hook — every response is marked non-cacheable, so pressing Back after logout always hits the server fresh
-- **Auth-aware redirects** — `/login` and `/verify-otp` redirect authenticated users to dashboard instead of allowing back-navigation to those pages
+### UI / Client-Side Security
+- **Focus-loss blur shield** — full-screen blur overlay activates on tab switch
+- **Password paste/copy/cut blocked** — prevents clipboard operations on all password fields (+ `MutationObserver` for dynamic fields)
+- **`autocomplete="off"`** on OTP, transfer, and account number fields
+- **`robots.txt`** — blocks search engines from all sensitive routes
 
 ### Transfer Security
-- **11-digit account number system** — every user gets a unique, auto-generated 11-digit account number on admin approval
-- **Strict receiver validation** — transfers require the exact 11-digit receiver account number (regex enforced server-side)
-- **Self-transfer prevention** — users cannot transfer money to their own account
-- **Atomic balance update** — sender is debited and receiver is credited in the same DB transaction
+- **Transfer confirmation step** — shows summary before executing; re-validates server-side on confirm
+- **11-digit account number system** — auto-generated unique account on approval
+- **Self-transfer prevention** — blocked at route level
+- **Atomic balance update** — debit sender and credit receiver in the same transaction
+- **Minimum transfer amount** — INR 1 minimum enforced
 
 ### Input Validation
-- All text fields sanitized with regex — blocks SQL-like patterns (`;`, `'`, `"`, `--`), HTML/JS injection, and control characters
-- Parameterized queries used for all database operations (no string interpolation)
+- All text fields sanitized with regex — blocks SQL-like patterns, HTML/JS injection
+- Parameterized queries for all DB operations
 - Length limits enforced on all inputs
 
 ### Logging & Audit
-- **`activity_logs` table** — records all security events (login, failed auth, lockout, logout) with timestamp, IP, user ID
-- **`transaction_logs` table** — separate tamper-resistant audit trail for every money transfer (sender, receiver account, amount, note, IP)
-- **`security.log`** — file-based log for server-side audit (not committed to git)
-- **`transactions.log`** — file-based transaction audit log (not committed to git)
+- **`activity_logs` table** — all security events with timestamp, IP, user ID
+- **`transaction_logs` table** — separate tamper-resistant audit trail for every transfer
+- **`security.log`** and **`transactions.log`** — file-based logs (gitignored)
+- **Admin: security logs** — `/admin/logs`
+- **Admin: transaction audit logs** — `/admin/transaction-logs`
 
 ---
 
@@ -54,14 +63,16 @@ Build a secure, easy-to-use web banking platform for rural users that is resista
 | Feature | Route |
 |---|---|
 | User registration (pending approval) | `POST /register` |
-| Admin approves/views signup requests | `GET/POST /admin/requests` |
+| Admin approves signup requests | `GET/POST /admin/requests` |
+| Admin rejects signup requests | `POST /admin/requests/<id>/reject` |
 | Login with password | `POST /login` |
 | OTP verification | `POST /verify-otp` |
 | OTP resend | `POST /resend-otp` |
 | Dashboard (balance + account number) | `GET /dashboard` |
-| Money transfer | `GET/POST /transfer` |
+| Money transfer (step 1 — validate) | `GET/POST /transfer` |
+| Money transfer (step 2 — confirm) | `GET/POST /transfer/confirm` |
 | Transaction history | `GET /history` |
-| Admin: security activity logs | `GET /admin/logs` |
+| Admin: security logs | `GET /admin/logs` |
 | Admin: transaction audit logs | `GET /admin/transaction-logs` |
 | Language switcher | `GET /set-language/<lang>` |
 | Logout | `GET /logout` |
@@ -70,15 +81,13 @@ Build a secure, easy-to-use web banking platform for rural users that is resista
 
 ## Multilingual Support
 
-The entire UI supports three languages, switchable at runtime:
-
 | Code | Language | Script |
 |---|---|---|
 | `en` | English | Latin |
 | `hi` | हिन्दी (Hindi) | Devanagari |
 | `mr` | मराठी (Marathi) | Devanagari |
 
-Language preference is stored in the session. All 46 UI strings are translated, including navigation, form labels, buttons, headings, and empty-state messages. Language switcher buttons show native script names.
+All 50+ UI strings translated including navigation, form labels, buttons, headings, confirmation messages, and empty-state messages.
 
 ---
 
@@ -86,11 +95,11 @@ Language preference is stored in the session. All 46 UI strings are translated, 
 
 | Layer | Technology |
 |---|---|
-| Backend | Python 3.x, Flask |
-| Auth | Flask-Login, Flask-Bcrypt, Flask-WTF |
+| Backend | Python 3.x, Flask 3.1.3 |
+| Auth | Flask-Login 0.6.3, Flask-Bcrypt 1.0.1, Flask-WTF 1.2.2 |
 | Database | SQLite (via `sqlite3`) |
 | Templates | Jinja2, HTML5, Vanilla CSS |
-| Deployment | uWSGI (Linux), Flask dev server (Windows) |
+| Deployment | uWSGI (Linux production), Flask dev server (Windows) |
 | Proxy | Werkzeug `ProxyFix` (Nginx-compatible) |
 
 ---
@@ -99,29 +108,32 @@ Language preference is stored in the session. All 46 UI strings are translated, 
 
 ```text
 Cybersecurity-Framework-for-Rural-Digital-Banking/
-├── app.py                        # Main Flask application
-├── requirements.txt
-├── uwsgi.ini                     # uWSGI production config
-├── .env                          # Local secrets (gitignored)
-├── banking.db                    # SQLite database (gitignored)
-├── security.log                  # Security event log (gitignored)
-├── transactions.log              # Transaction audit log (gitignored)
+├── app.py                          # Main Flask application
+├── requirements.txt                # Pinned exact versions
+├── uwsgi.ini                       # uWSGI production config
+├── .env                            # Local secrets (gitignored)
+├── run_dev.bat                     # Windows dev launcher (gitignored)
+├── banking.db                      # SQLite database (gitignored)
+├── security.log                    # Security event log (gitignored)
+├── transactions.log                # Transaction audit log (gitignored)
 ├── static/
-│   └── style.css
+│   ├── style.css
+│   └── robots.txt
 ├── templates/
-│   ├── base.html                 # Layout, blur shield, security JS
+│   ├── base.html                   # Layout, blur shield, security JS
 │   ├── index.html
 │   ├── login.html
 │   ├── register.html
 │   ├── verify_otp.html
 │   ├── dashboard.html
 │   ├── transfer.html
+│   ├── transfer_confirm.html       # Step 2 confirmation page
 │   ├── history.html
 │   ├── admin_logs.html
-│   ├── admin_requests.html
+│   ├── admin_requests.html         # Approve + Reject buttons
 │   └── admin_transaction_logs.html
 └── tests/
-    └── test_security.py          # Automated security test suite
+    └── test_security.py            # 11 automated pen-test cases
 ```
 
 ---
@@ -138,7 +150,7 @@ pip install -r requirements.txt
 
 ### 2. Configure environment
 
-Create a `.env` file in the project root (it is gitignored):
+Create a `.env` file in the project root (gitignored):
 
 ```env
 SECRET_KEY=your-long-random-secret-key
@@ -150,13 +162,14 @@ SMTP_FROM=your_email@gmail.com
 SMTP_USE_TLS=1
 ```
 
-> **Gmail App Password:** Go to [myaccount.google.com/apppasswords](https://myaccount.google.com/apppasswords), generate an App Password (requires 2-Step Verification enabled), and use that instead of your regular Gmail password.
+> **Gmail App Password:** Go to [myaccount.google.com/apppasswords](https://myaccount.google.com/apppasswords), generate an App Password (requires 2-Step Verification), and use that as `SMTP_PASSWORD`.
 
 ### 3. Run (Windows / Development)
 
 ```bash
 python app.py
 ```
+Or double-click `run_dev.bat` (after filling in `SMTP_PASSWORD`).
 
 Then open: [http://127.0.0.1:5000](http://127.0.0.1:5000)
 
@@ -187,7 +200,6 @@ server {
         proxy_set_header X-Forwarded-Port $server_port;
     }
 }
-
 server {
     listen 80;
     server_name your-domain.com;
@@ -195,22 +207,45 @@ server {
 }
 ```
 
-Keep `TRUST_REVERSE_PROXY=1` (default) when running behind Nginx.
-
 ---
 
 ## Functional Flow
 
 ```
 1. User submits signup request  →  stored as pending
-2. Admin reviews /admin/requests  →  approves with one click
-3. System assigns unique 11-digit account number  →  sends approval email
-4. User logs in with email + password  →  OTP sent to registered email
-5. User enters OTP  →  session established
-6. User views dashboard (balance + account number)
-7. User transfers money using receiver's 11-digit account number
-8. Transfer debits sender, credits receiver, logs to transaction_logs
+2. Admin reviews /admin/requests  →  Approve or Reject
+3. On approval: unique 11-digit account number assigned, approval email sent
+4. On rejection: rejection email sent to user
+5. User logs in with email + password  →  OTP sent to email
+6. User enters OTP  →  session established (10-min inactivity timeout)
+7. User views dashboard (balance + account number)
+8. User fills transfer form  →  confirmation page shown
+9. User confirms  →  atomic debit/credit executed, audit logged
 ```
+
+---
+
+## Automated Security Tests
+
+```bash
+python -m pytest tests/test_security.py -v
+```
+
+**11 tests covering:**
+
+| Test | Attack / Scenario |
+|---|---|
+| `test_bruteforce_lockout_after_multiple_failures` | Brute-force login |
+| `test_csrf_protection_is_active_on_all_forms` | CSRF middleware presence |
+| `test_customer_cannot_access_admin_routes` | Privilege escalation |
+| `test_no_store_cache_headers_on_authenticated_responses` | Back-button cache attack |
+| `test_otp_required_before_dashboard_access` | OTP bypass |
+| `test_otp_retry_limit_enforced` | OTP brute-force |
+| `test_signup_creates_pending_request_not_active_user` | Instant account activation |
+| `test_sql_injection_payload_cannot_bypass_login` | SQL injection |
+| `test_transfer_input_sanitization_blocks_injection_patterns` | Input injection in transfer |
+| `test_transfer_to_own_account_is_rejected` | Self-transfer |
+| `test_transfer_with_insufficient_balance_is_rejected` | Overdraft / negative balance |
 
 ---
 
@@ -219,30 +254,15 @@ Keep `TRUST_REVERSE_PROXY=1` (default) when running behind Nginx.
 | Test | Expected Result |
 |---|---|
 | Wrong password × 5 | Account locked for 15 min |
-| Wrong password × 6+ | `Account temporarily locked` message |
-| SQL injection in login (`' OR 1=1 --`) | Rejected — parameterized queries |
+| SQL injection in login `' OR 1=1 --` | Rejected — parameterized queries |
 | XSS/injection in transfer fields | Rejected — regex sanitization |
-| Wrong OTP × 5 | OTP session cleared, must log in again |
+| Wrong OTP × 5 | Session cleared |
 | Back button after logout | Redirected to login (no-store cache) |
-| Back button to OTP after login | Redirected to dashboard |
-| Paste into password field | Blocked by JS event listeners |
-| Tab away from banking session | Blur shield covers the screen |
-| Transfer to non-existent account | `Account not found` error |
-| Transfer to own account | `Cannot transfer to yourself` error |
-| Transfer more than balance | `Insufficient balance` error |
-
----
-
-## Automated Tests
-
-```bash
-python -m pytest tests/test_security.py -v
-```
-
-**6 tests cover:**
-- Brute-force lockout enforcement
-- SQL injection bypass attempt
-- OTP required before dashboard access
-- OTP retry limit enforcement
-- Transfer input sanitization
-- Signup creates pending request (not active user)
+| Paste into password field | Blocked by JS |
+| Tab away from session | Blur shield covers screen |
+| Transfer to own account | Rejected |
+| Transfer > balance | Rejected |
+| Customer visits `/admin/*` | Unauthorized — redirected |
+| Page in iframe | Blocked — `X-Frame-Options: DENY` |
+| Idle for 10+ minutes | Auto-logged out |
+| Weak password (no special char) | Registration rejected |
