@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="card">
+    <h2>{{ lang_data.nav_transaction_logs }}</h2>
+    {% if logs %}
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>#</th>
+                    <th>Sender</th>
+                    <th>Sender Account</th>
+                    <th>Receiver</th>
+                    <th>Receiver Account</th>
+                    <th>Amount (INR)</th>
+                    <th>Note</th>
+                    <th>IP</th>
+                    <th>Time (UTC)</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for log in logs %}
+                    <tr>
+                        <td>{{ log.id }}</td>
+                        <td>{{ log.sender_name or "-" }}</td>
+                        <td class="mono">{{ log.sender_account }}</td>
+                        <td>{{ log.receiver_name }}</td>
+                        <td class="mono">{{ log.receiver_account }}</td>
+                        <td><strong>{{ "%.2f"|format(log.amount) }}</strong></td>
+                        <td>{{ log.note or "-" }}</td>
+                        <td class="mono">{{ log.ip_address }}</td>
+                        <td>{{ log.created_at }}</td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    {% else %}
+        <p class="hint">No transactions recorded yet.</p>
+    {% endif %}
+</section>
+{% endblock %}

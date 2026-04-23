@@ -39,6 +39,7 @@
             {% if current_user.role == "admin" %}
                 <a href="{{ url_for('admin_requests') }}">{{ lang_data.nav_signup_requests }}</a>
                 <a href="{{ url_for('admin_logs') }}">{{ lang_data.nav_security_logs }}</a>
+                <a href="{{ url_for('admin_transaction_logs') }}">{{ lang_data.nav_transaction_logs }}</a>
             {% endif %}
             <a href="{{ url_for('logout') }}">{{ lang_data.nav_logout }}</a>
         {% else %}
@@ -71,17 +72,14 @@
                 return false;
             }, true);
         });
-        // Also block right-click context menu on password inputs
         el.addEventListener("contextmenu", function (e) {
             e.preventDefault();
             return false;
         });
     }
 
-    // Apply immediately to any password inputs already in the DOM
     document.querySelectorAll('input[type="password"]').forEach(lockPasswordField);
 
-    // Also watch for dynamically added inputs (future-proof)
     var observer = new MutationObserver(function (mutations) {
         mutations.forEach(function (m) {
             m.addedNodes.forEach(function (node) {
@@ -96,27 +94,19 @@
     });
     observer.observe(document.body, { childList: true, subtree: true });
 
-    /* ── 2. BLUR OVERLAY when tab loses focus ─────────────────────────
-       Shows a full-screen blur shield so a screen recording or someone
-       looking at the screen while you switch tabs can't see your data.
-       This is the same technique used by banking apps on mobile.        */
+    /* ── 2. BLUR OVERLAY when tab loses focus ─────────────────────────── */
     var shield = document.getElementById("focus-shield");
 
-    function showShield() {
-        if (shield) shield.classList.add("visible");
-    }
-    function hideShield() {
-        if (shield) shield.classList.remove("visible");
-    }
+    function showShield() { if (shield) shield.classList.add("visible"); }
+    function hideShield() { if (shield) shield.classList.remove("visible"); }
 
     document.addEventListener("visibilitychange", function () {
         if (document.hidden) { showShield(); } else { hideShield(); }
     });
-
     window.addEventListener("blur", showShield);
     window.addEventListener("focus", hideShield);
 
-    /* ── 3. DISABLE DRAG on sensitive displayed values ────────────────── */
+    /* ── 3. DISABLE DRAG on sensitive displayed values ───────────────── */
     document.querySelectorAll(".sensitive").forEach(function (el) {
         el.addEventListener("dragstart", function (e) { e.preventDefault(); });
     });

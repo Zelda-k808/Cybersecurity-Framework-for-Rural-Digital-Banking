@@ -50,6 +50,7 @@ LANG_CONTENT = {
         "nav_history": "History",
         "nav_signup_requests": "Signup Requests",
         "nav_security_logs": "Security Logs",
+        "nav_transaction_logs": "Transaction Logs",
         "nav_logout": "Logout",
         "register": "Register",
         "login": "Login",
@@ -138,6 +139,7 @@ LANG_CONTENT = {
         "nav_history": "इतिहास",
         "nav_signup_requests": "साइनअप अनुरोध",
         "nav_security_logs": "सुरक्षा लॉग",
+        "nav_transaction_logs": "लेनदेन लॉग",
         "nav_logout": "लॉगआउट",
         "register": "रजिस्टर करें",
         "login": "लॉगिन करें",
@@ -226,6 +228,7 @@ LANG_CONTENT = {
         "nav_history": "इतिहास",
         "nav_signup_requests": "साइनअप विनंत्या",
         "nav_security_logs": "सुरक्षा लॉग",
+        "nav_transaction_logs": "व्यवहार लॉग",
         "nav_logout": "बाहेर पडा",
         "register": "नोंदणी करा",
         "login": "लॉगिन करा",
@@ -405,6 +408,19 @@ def init_db():
             created_at TEXT NOT NULL
         );
 
+        CREATE TABLE IF NOT EXISTS transaction_logs (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            sender_id INTEGER NOT NULL,
+            sender_account TEXT NOT NULL,
+            receiver_name TEXT NOT NULL,
+            receiver_account TEXT NOT NULL,
+            amount REAL NOT NULL,
+            note TEXT,
+            ip_address TEXT NOT NULL,
+            created_at TEXT NOT NULL,
+            FOREIGN KEY(sender_id) REFERENCES users(id)
+        );
+
         CREATE TABLE IF NOT EXISTS otp_challenges (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             email TEXT NOT NULL,
@@ -448,6 +464,25 @@ def init_db():
     txn_cols = [row[1] for row in db.execute("PRAGMA table_info(transactions)").fetchall()]
     if "receiver_account_number" not in txn_cols:
         db.execute("ALTER TABLE transactions ADD COLUMN receiver_account_number TEXT")
+        db.commit()
+
+    # Migrate: create transaction_logs table if missing
+    existing_tables = [r[0] for r in db.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()]
+    if "transaction_logs" not in existing_tables:
+        db.execute("""
+            CREATE TABLE transaction_logs (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                sender_id INTEGER NOT NULL,
+                sender_account TEXT NOT NULL,
+                receiver_name TEXT NOT NULL,
+                receiver_account TEXT NOT NULL,
+                amount REAL NOT NULL,
+                note TEXT,
+                ip_address TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                FOREIGN KEY(sender_id) REFERENCES users(id)
+            )
+        """)
         db.commit()
 
 
@@ -504,6 +539,34 @@ def log_activity(user_id, event_type, description):
         VALUES (?, ?, ?, ?, ?)
         """,
         (user_id, event_type, ip, description, now_iso()),
+    )
+    db.commit()
+
+
+# Separate file-based logger for transactions only
+_txn_logger = logging.getLogger("transactions")
+_txn_logger.setLevel(logging.INFO)
+_txn_logger.propagate = False  # don't bleed into security.log
+_txn_file_handler = logging.FileHandler(os.path.join(BASE_DIR, "transactions.log"))
+_txn_file_handler.setFormatter(logging.Formatter("%(asctime)s %(message)s"))
+_txn_logger.addHandler(_txn_file_handler)
+
+
+def log_transaction(sender_id, sender_account, receiver_name, receiver_account, amount, note):
+    """Record a transfer in transaction_logs table and transactions.log file."""
+    ip = get_client_ip()
+    _txn_logger.info(
+        "TRANSFER sender=%s (%s) -> %s (%s) amount=%.2f note=%s ip=%s",
+        sender_id, sender_account, receiver_name, receiver_account, amount, note or "", ip
+    )
+    db = get_db()
+    db.execute(
+        """
+        INSERT INTO transaction_logs
+            (sender_id, sender_account, receiver_name, receiver_account, amount, note, ip_address, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        """,
+        (sender_id, sender_account, receiver_name, receiver_account, amount, note, ip, now_iso()),
     )
     db.commit()
 
@@ -1134,8 +1197,20 @@ def transfer():
             flash("Insufficient balance.", "danger")
             return redirect(url_for("transfer"))
 
+        # Look up receiver by account number
+        receiver_user = db.execute(
+            "SELECT id, full_name, balance FROM users WHERE account_number = ?",
+            (receiver_account,)
+        ).fetchone()
+        if not receiver_user:
+            flash("No account found with that account number. Please check and try again.", "danger")
+            return redirect(url_for("transfer"))
+
         new_balance = current_balance - amount
+        receiver_new_balance = receiver_user["balance"] + amount
+
         db.execute("UPDATE users SET balance = ? WHERE id = ?", (new_balance, current_user.id))
+        db.execute("UPDATE users SET balance = ? WHERE id = ?", (receiver_new_balance, receiver_user["id"]))
         db.execute(
             """
             INSERT INTO transactions (user_id, txn_type, amount, receiver_name, receiver_account_number, note, created_at)
@@ -1144,7 +1219,17 @@ def transfer():
             (current_user.id, amount, receiver, receiver_account, note, now_iso()),
         )
         db.commit()
-        log_activity(current_user.id, "transfer_success", f"Transferred {amount:.2f} to {receiver} ({receiver_account})")
+
+        # Fetch sender's account number for the log
+        sender_row = db.execute("SELECT account_number FROM users WHERE id = ?", (current_user.id,)).fetchone()
+        log_transaction(
+            current_user.id,
+            sender_row["account_number"] if sender_row else "unknown",
+            receiver,
+            receiver_account,
+            amount,
+            note,
+        )
         flash("Transfer successful.", "success")
         return redirect(url_for("history"))
 
@@ -1184,6 +1269,29 @@ def admin_logs():
         """
     ).fetchall()
     return render_template("admin_logs.html", logs=rows)
+
+
+@app.route("/admin/transaction-logs")
+@login_required
+def admin_transaction_logs():
+    if current_user.role != "admin":
+        flash("Unauthorized. Admin access required.", "danger")
+        return redirect(url_for("dashboard"))
+
+    db = get_db()
+    rows = db.execute(
+        """
+        SELECT
+            tl.id, tl.sender_account, tl.receiver_name, tl.receiver_account,
+            tl.amount, tl.note, tl.ip_address, tl.created_at,
+            u.full_name AS sender_name
+        FROM transaction_logs tl
+        LEFT JOIN users u ON u.id = tl.sender_id
+        ORDER BY tl.created_at DESC
+        LIMIT 200
+        """
+    ).fetchall()
+    return render_template("admin_transaction_logs.html", logs=rows)
 
 
 @app.route("/logout")

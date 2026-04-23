@@ -4,6 +4,7 @@ __pycache__/
 venv/
 banking.db
 security.log
+transactions.log
 
 # Dev secrets — never commit these
 run_dev.bat
