@@ -138,6 +138,122 @@ class SecurityTestCase(unittest.TestCase):
         login_response = self.login_password_step()
         self.assertIn(b"Account approval pending", login_response.data)
 
+    def test_csrf_protection_is_active_on_all_forms(self):
+        """CSRF protection must be active: CSRFProtect must be registered on the
+        app and every POST form must contain a hidden csrf_token input field."""
+        # 1 — middleware level: CSRFProtect must be registered on the app
+        self.assertIn(
+            "csrf",
+            app.extensions,
+            "CSRFProtect is not registered on the app — CSRF protection is missing",
+        )
+
+        # 2 — form level: the rendered login page must contain a csrf_token field
+        response = self.client.get("/login")
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(
+            b'name="csrf_token"',
+            response.data,
+            "Login form does not contain a CSRF token hidden input",
+        )
+
+        # 3 — form level: the register page must also contain a csrf_token field
+        response = self.client.get("/register")
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(
+            b'name="csrf_token"',
+            response.data,
+            "Register form does not contain a CSRF token hidden input",
+        )
+
+
+
+
+    def test_customer_cannot_access_admin_routes(self):
+        """Authenticated customers must be denied access to all admin-only routes."""
+        self.full_login()
+        admin_routes = ["/admin/logs", "/admin/requests", "/admin/transaction-logs"]
+        for route in admin_routes:
+            response = self.client.get(route, follow_redirects=True)
+            self.assertIn(
+                b"Unauthorized",
+                response.data,
+                msg=f"Customer was not denied access to {route}",
+            )
+
+    def test_no_store_cache_headers_on_authenticated_responses(self):
+        """Every authenticated response must carry Cache-Control: no-store to
+        prevent the browser from caching sensitive pages."""
+        self.full_login()
+        for route in ["/dashboard", "/transfer", "/history"]:
+            response = self.client.get(route)
+            cache_control = response.headers.get("Cache-Control", "")
+            self.assertIn(
+                "no-store",
+                cache_control,
+                msg=f"Cache-Control: no-store missing on {route} (got: {cache_control!r})",
+            )
+
+    def test_transfer_to_own_account_is_rejected(self):
+        """Users must not be able to transfer money to their own account number."""
+        self.full_login()
+        import sqlite3
+        db = sqlite3.connect(app.config["DATABASE"])
+        db.row_factory = sqlite3.Row
+        row = db.execute(
+            "SELECT account_number FROM users WHERE email = ?",
+            ("test@example.com",),
+        ).fetchone()
+        own_account = row["account_number"]
+        db.close()
+
+        response = self.client.post(
+            "/transfer",
+            data={
+                "receiver": "Test User",
+                "receiver_account": own_account,
+                "amount": "100",
+                "note": "self transfer attempt",
+            },
+            follow_redirects=True,
+        )
+        # exact flash message from app.py line 943
+        self.assertIn(b"You cannot transfer to your own account.", response.data)
+
+    def test_transfer_with_insufficient_balance_is_rejected(self):
+        """Transfer amount exceeding the sender's balance must be rejected.
+        A second receiver user must exist so the route reaches the balance check.
+        """
+        self.full_login()
+        # Create a second user to act as receiver so the account lookup succeeds
+        self.create_user_directly(
+            name="Receiver",
+            email="receiver@example.com",
+            password="ReceiverPass123",
+            role="customer",
+        )
+        import sqlite3
+        db = sqlite3.connect(app.config["DATABASE"])
+        db.row_factory = sqlite3.Row
+        row = db.execute(
+            "SELECT account_number FROM users WHERE email = ?",
+            ("receiver@example.com",),
+        ).fetchone()
+        receiver_account = row["account_number"]
+        db.close()
+
+        response = self.client.post(
+            "/transfer",
+            data={
+                "receiver": "Receiver",
+                "receiver_account": receiver_account,
+                "amount": "99999999",  # far exceeds default 5000.00 balance
+                "note": "overdraft attempt",
+            },
+            follow_redirects=True,
+        )
+        self.assertIn(b"Insufficient balance.", response.data)
+
 
 if __name__ == "__main__":
     unittest.main()
