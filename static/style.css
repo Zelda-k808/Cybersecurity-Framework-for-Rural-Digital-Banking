@@ -155,3 +155,59 @@ input {
 .table th {
     background: #eef4fb;
 }
+
+/* ── Security: blur overlay when tab loses focus ───────────────────── */
+#focus-shield {
+    display: none;
+    position: fixed;
+    inset: 0;
+    z-index: 99999;
+    background: rgba(6, 57, 112, 0.92);
+    backdrop-filter: blur(18px);
+    -webkit-backdrop-filter: blur(18px);
+    align-items: center;
+    justify-content: center;
+    color: #fff;
+    text-align: center;
+}
+#focus-shield.visible {
+    display: flex;
+}
+.focus-shield-inner {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 16px;
+}
+.focus-shield-inner p {
+    font-size: 1.15rem;
+    font-weight: 600;
+    line-height: 1.6;
+    opacity: 0.9;
+}
+
+/* ── Security: prevent text-selection on sensitive values ───────────── */
+.sensitive,
+.balance,
+.account-number {
+    user-select: none;
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+}
+
+/* ── Security: no drag on sensitive elements ────────────────────────── */
+.sensitive,
+.balance,
+.account-number {
+    -webkit-user-drag: none;
+}
+
+.account-number {
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: #0b57a2;
+    letter-spacing: 0.12em;
+    font-family: monospace;
+}
+

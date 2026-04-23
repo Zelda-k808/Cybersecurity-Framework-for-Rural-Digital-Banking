@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="{{ selected_lang }}">
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -7,29 +7,40 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}" />
 </head>
 <body>
+
+    <!-- ── Blur overlay: shown when tab loses focus ─────────────────── -->
+    <div id="focus-shield" aria-hidden="true">
+        <div class="focus-shield-inner">
+            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+            </svg>
+            <p>Session paused.<br>Return to this tab to continue.</p>
+        </div>
+    </div>
+
     <header class="topbar">
         <div>
             <h1>{{ lang_data.app_title }}</h1>
             <p class="subtitle">{{ lang_data.hero_text }}</p>
         </div>
         <div class="lang-switch">
-            <a href="{{ url_for('set_language', lang='en') }}">EN</a>
-            <a href="{{ url_for('set_language', lang='hi') }}">HI</a>
-            <a href="{{ url_for('set_language', lang='mr') }}">MR</a>
+            <a href="{{ url_for('set_language', lang='en') }}" class="{{ 'active' if selected_lang == 'en' }}">{{ lang_data.lang_en }}</a>
+            <a href="{{ url_for('set_language', lang='hi') }}" class="{{ 'active' if selected_lang == 'hi' }}">{{ lang_data.lang_hi }}</a>
+            <a href="{{ url_for('set_language', lang='mr') }}" class="{{ 'active' if selected_lang == 'mr' }}">{{ lang_data.lang_mr }}</a>
         </div>
     </header>
 
     <nav class="navbar">
-        <a href="{{ url_for('home') }}">Home</a>
+        <a href="{{ url_for('home') }}">{{ lang_data.nav_home }}</a>
         {% if current_user.is_authenticated %}
-            <a href="{{ url_for('dashboard') }}">Dashboard</a>
-            <a href="{{ url_for('transfer') }}">Transfer</a>
-            <a href="{{ url_for('history') }}">History</a>
+            <a href="{{ url_for('dashboard') }}">{{ lang_data.nav_dashboard }}</a>
+            <a href="{{ url_for('transfer') }}">{{ lang_data.nav_transfer }}</a>
+            <a href="{{ url_for('history') }}">{{ lang_data.nav_history }}</a>
             {% if current_user.role == "admin" %}
-                <a href="{{ url_for('admin_requests') }}">Signup Requests</a>
-                <a href="{{ url_for('admin_logs') }}">Security Logs</a>
+                <a href="{{ url_for('admin_requests') }}">{{ lang_data.nav_signup_requests }}</a>
+                <a href="{{ url_for('admin_logs') }}">{{ lang_data.nav_security_logs }}</a>
             {% endif %}
-            <a href="{{ url_for('logout') }}">Logout</a>
+            <a href="{{ url_for('logout') }}">{{ lang_data.nav_logout }}</a>
         {% else %}
             <a href="{{ url_for('register') }}">{{ lang_data.register }}</a>
             <a href="{{ url_for('login') }}">{{ lang_data.login }}</a>
@@ -46,5 +57,71 @@
         {% endwith %}
         {% block content %}{% endblock %}
     </main>
+
+<script>
+(function () {
+    "use strict";
+
+    /* ── 1. BLOCK PASTE / COPY / CUT / RIGHT-CLICK on password fields ── */
+    function lockPasswordField(el) {
+        ["paste", "copy", "cut"].forEach(function (evt) {
+            el.addEventListener(evt, function (e) {
+                e.preventDefault();
+                e.stopPropagation();
+                return false;
+            }, true);
+        });
+        // Also block right-click context menu on password inputs
+        el.addEventListener("contextmenu", function (e) {
+            e.preventDefault();
+            return false;
+        });
+    }
+
+    // Apply immediately to any password inputs already in the DOM
+    document.querySelectorAll('input[type="password"]').forEach(lockPasswordField);
+
+    // Also watch for dynamically added inputs (future-proof)
+    var observer = new MutationObserver(function (mutations) {
+        mutations.forEach(function (m) {
+            m.addedNodes.forEach(function (node) {
+                if (node.nodeType === 1) {
+                    if (node.matches && node.matches('input[type="password"]')) {
+                        lockPasswordField(node);
+                    }
+                    node.querySelectorAll && node.querySelectorAll('input[type="password"]').forEach(lockPasswordField);
+                }
+            });
+        });
+    });
+    observer.observe(document.body, { childList: true, subtree: true });
+
+    /* ── 2. BLUR OVERLAY when tab loses focus ─────────────────────────
+       Shows a full-screen blur shield so a screen recording or someone
+       looking at the screen while you switch tabs can't see your data.
+       This is the same technique used by banking apps on mobile.        */
+    var shield = document.getElementById("focus-shield");
+
+    function showShield() {
+        if (shield) shield.classList.add("visible");
+    }
+    function hideShield() {
+        if (shield) shield.classList.remove("visible");
+    }
+
+    document.addEventListener("visibilitychange", function () {
+        if (document.hidden) { showShield(); } else { hideShield(); }
+    });
+
+    window.addEventListener("blur", showShield);
+    window.addEventListener("focus", hideShield);
+
+    /* ── 3. DISABLE DRAG on sensitive displayed values ────────────────── */
+    document.querySelectorAll(".sensitive").forEach(function (el) {
+        el.addEventListener("dragstart", function (e) { e.preventDefault(); });
+    });
+
+})();
+</script>
 </body>
 </html>

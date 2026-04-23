@@ -1,20 +1,40 @@
 {% extends "base.html" %}
 {% block content %}
 <section class="card form-card">
-    <h2>Create Account</h2>
-    <p class="hint">After signup, admin approval is required before you can login.</p>
-    <form method="POST">
+    <h2>{{ lang_data.register_heading }}</h2>
+    <p class="hint">{{ lang_data.register_hint }}</p>
+    <form method="POST" autocomplete="off">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
-        <label>Full Name</label>
-        <input type="text" name="full_name" required maxlength="100" />
 
-        <label>Email</label>
-        <input type="email" name="email" required />
+        <label>{{ lang_data.register_fullname }}</label>
+        <input
+            type="text"
+            name="full_name"
+            required
+            maxlength="100"
+            autocomplete="name"
+            spellcheck="false"
+        />
 
-        <label>Password</label>
-        <input type="password" name="password" required minlength="8" />
+        <label>{{ lang_data.register_email }}</label>
+        <input
+            type="email"
+            name="email"
+            required
+            autocomplete="email"
+            spellcheck="false"
+        />
 
-        <button type="submit" class="btn">Register</button>
+        <label>{{ lang_data.register_password }}</label>
+        <input
+            type="password"
+            name="password"
+            required
+            minlength="8"
+            autocomplete="new-password"
+        />
+
+        <button type="submit" class="btn">{{ lang_data.register_btn }}</button>
     </form>
 </section>
 {% endblock %}
