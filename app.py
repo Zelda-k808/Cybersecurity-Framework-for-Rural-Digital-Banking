@@ -13,6 +13,8 @@ from flask import Flask, flash, g, redirect, render_template, request, session, 
 from flask_bcrypt import Bcrypt
 from flask_login import (LoginManager, UserMixin, current_user, login_required,
                          login_user, logout_user)
+from flask_wtf.csrf import CSRFError, CSRFProtect
+from werkzeug.middleware.proxy_fix import ProxyFix
 
 
 BASE_DIR = os.path.abspath(os.path.dirname(__file__))
@@ -52,9 +54,21 @@ app.config["SMTP_USERNAME"] = os.environ.get("SMTP_USERNAME", "")
 app.config["SMTP_PASSWORD"] = os.environ.get("SMTP_PASSWORD", "")
 app.config["SMTP_FROM"] = os.environ.get("SMTP_FROM", "noreply@ruralbank.local")
 app.config["SMTP_USE_TLS"] = os.environ.get("SMTP_USE_TLS", "1") == "1"
+app.config["TRUST_REVERSE_PROXY"] = os.environ.get("TRUST_REVERSE_PROXY", "1") == "1"
+app.config["SESSION_COOKIE_SECURE"] = True
+app.config["SESSION_COOKIE_HTTPONLY"] = True
+app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
+app.config["REMEMBER_COOKIE_SECURE"] = True
+app.config["REMEMBER_COOKIE_HTTPONLY"] = True
+app.config["REMEMBER_COOKIE_SAMESITE"] = "Lax"
+app.config["WTF_CSRF_ENABLED"] = True
 bcrypt = Bcrypt(app)
+csrf = CSRFProtect(app)
 login_manager = LoginManager(app)
 login_manager.login_view = "login"
+
+if app.config["TRUST_REVERSE_PROXY"]:
+    app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_port=1)
 
 logging.basicConfig(
     level=logging.INFO,
@@ -141,6 +155,17 @@ def init_db():
             consumed INTEGER NOT NULL DEFAULT 0,
             created_at TEXT NOT NULL
         );
+
+        CREATE TABLE IF NOT EXISTS signup_requests (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            full_name TEXT NOT NULL,
+            email TEXT NOT NULL UNIQUE,
+            password_hash TEXT NOT NULL,
+            status TEXT NOT NULL DEFAULT 'pending',
+            reviewed_by INTEGER,
+            reviewed_at TEXT,
+            created_at TEXT NOT NULL
+        );
         """
     )
     db.commit()
@@ -199,6 +224,18 @@ def get_user_by_email(email):
     return User(row["id"], row["full_name"], row["email"], row["password_hash"], row["role"])
 
 
+def get_pending_signup_by_email(email):
+    db = get_db()
+    return db.execute(
+        """
+        SELECT * FROM signup_requests
+        WHERE email = ? AND status = 'pending'
+        LIMIT 1
+        """,
+        (email,),
+    ).fetchone()
+
+
 def clear_pending_auth():
     session.pop("pending_user_email", None)
 
@@ -233,6 +270,35 @@ def send_otp(email, otp_code):
         return True
     except Exception as exc:  # noqa: BLE001
         logging.error("Failed to send OTP email to %s: %s", email, exc)
+        return False
+
+
+def send_email_message(to_email, subject, body):
+    if app.config.get("TESTING"):
+        app.config["LAST_SENT_EMAIL"] = {"to": to_email, "subject": subject, "body": body}
+        return True
+
+    smtp_host = app.config.get("SMTP_HOST")
+    smtp_username = app.config.get("SMTP_USERNAME")
+    smtp_password = app.config.get("SMTP_PASSWORD")
+    if not smtp_host or not smtp_username or not smtp_password:
+        logging.error("SMTP not configured. Email delivery failed for %s", to_email)
+        return False
+
+    message = EmailMessage()
+    message["Subject"] = subject
+    message["From"] = app.config.get("SMTP_FROM")
+    message["To"] = to_email
+    message.set_content(body)
+    try:
+        with smtplib.SMTP(smtp_host, app.config.get("SMTP_PORT")) as server:
+            if app.config.get("SMTP_USE_TLS"):
+                server.starttls()
+            server.login(smtp_username, smtp_password)
+            server.send_message(message)
+        return True
+    except Exception as exc:  # noqa: BLE001
+        logging.error("Failed to send email to %s: %s", to_email, exc)
         return False
 
 
@@ -385,6 +451,12 @@ def inject_global_data():
     return {"lang_data": LANG_CONTENT.get(lang, LANG_CONTENT["en"]), "selected_lang": lang}
 
 
+@app.errorhandler(CSRFError)
+def handle_csrf_error(_error):
+    flash("Security validation failed. Please retry the action.", "danger")
+    return redirect(request.referrer or url_for("home"))
+
+
 @app.route("/set-language/<lang>")
 def set_language(lang):
     if lang in LANG_CONTENT:
@@ -414,22 +486,23 @@ def register():
         if password_error:
             flash(password_error, "danger")
             return redirect(url_for("register"))
-        if get_user_by_email(email):
-            flash("Email already registered.", "warning")
+        if get_user_by_email(email) or get_pending_signup_by_email(email):
+            flash("Email already has an account or pending request.", "warning")
             return redirect(url_for("register"))
 
         password_hash = bcrypt.generate_password_hash(password).decode("utf-8")
         db = get_db()
         db.execute(
             """
-            INSERT INTO users (full_name, email, password_hash, role, created_at)
-            VALUES (?, ?, ?, 'customer', ?)
+            INSERT INTO signup_requests (full_name, email, password_hash, status, created_at)
+            VALUES (?, ?, ?, 'pending', ?)
             """,
             (full_name, email, password_hash, now_iso()),
         )
         db.commit()
-        flash("Registration successful. Please login.", "success")
-        return redirect(url_for("login"))
+        log_activity(None, "signup_requested", f"Signup request submitted for email={email}")
+        flash("Signup request submitted. Wait for admin approval email before login.", "info")
+        return redirect(url_for("home"))
 
     return render_template("register.html")
 
@@ -444,6 +517,10 @@ def login():
 
         if not validators.email(email):
             flash("Enter a valid email address.", "danger")
+            return redirect(url_for("login"))
+
+        if get_pending_signup_by_email(email):
+            flash("Account approval pending. Please wait for admin email.", "warning")
             return redirect(url_for("login"))
 
         user = get_user_by_email(email)
@@ -588,6 +665,95 @@ def resend_otp():
     return redirect(url_for("verify_otp"))
 
 
+@app.route("/admin/requests")
+@login_required
+def admin_requests():
+    if current_user.role != "admin":
+        flash("Unauthorized. Admin access required.", "danger")
+        return redirect(url_for("dashboard"))
+
+    db = get_db()
+    pending_requests = db.execute(
+        """
+        SELECT id, full_name, email, created_at
+        FROM signup_requests
+        WHERE status = 'pending'
+        ORDER BY created_at ASC
+        """
+    ).fetchall()
+    return render_template("admin_requests.html", requests=pending_requests)
+
+
+@app.route("/admin/requests/<int:request_id>/approve", methods=["POST"])
+@login_required
+def approve_signup_request(request_id):
+    if current_user.role != "admin":
+        flash("Unauthorized. Admin access required.", "danger")
+        return redirect(url_for("dashboard"))
+
+    db = get_db()
+    signup_request = db.execute(
+        "SELECT * FROM signup_requests WHERE id = ? AND status = 'pending'",
+        (request_id,),
+    ).fetchone()
+    if not signup_request:
+        flash("Request not found or already reviewed.", "warning")
+        return redirect(url_for("admin_requests"))
+
+    existing_user = get_user_by_email(signup_request["email"])
+    if existing_user:
+        db.execute(
+            """
+            UPDATE signup_requests
+            SET status = 'approved', reviewed_by = ?, reviewed_at = ?
+            WHERE id = ?
+            """,
+            (current_user.id, now_iso(), request_id),
+        )
+        db.commit()
+        flash("User already existed. Request marked approved.", "info")
+        return redirect(url_for("admin_requests"))
+
+    db.execute(
+        """
+        INSERT INTO users (full_name, email, password_hash, role, created_at)
+        VALUES (?, ?, ?, 'customer', ?)
+        """,
+        (
+            signup_request["full_name"],
+            signup_request["email"],
+            signup_request["password_hash"],
+            now_iso(),
+        ),
+    )
+    db.execute(
+        """
+        UPDATE signup_requests
+        SET status = 'approved', reviewed_by = ?, reviewed_at = ?
+        WHERE id = ?
+        """,
+        (current_user.id, now_iso(), request_id),
+    )
+    db.commit()
+    log_activity(current_user.id, "signup_approved", f"Approved signup for email={signup_request['email']}")
+
+    sent = send_email_message(
+        signup_request["email"],
+        "Your account has been approved",
+        (
+            f"Hello {signup_request['full_name']},\n\n"
+            "Your account creation request has been approved. "
+            "You can now sign in to the banking portal.\n\n"
+            "Regards,\nAdmin Team"
+        ),
+    )
+    if sent:
+        flash("Signup approved and email sent to user.", "success")
+    else:
+        flash("Signup approved, but approval email failed to send.", "warning")
+    return redirect(url_for("admin_requests"))
+
+
 @app.route("/dashboard")
 @login_required
 def dashboard():
@@ -694,4 +860,7 @@ def logout():
 
 
 if __name__ == "__main__":
-    app.run(debug=True)
+    # uWSGI is Linux-only; use Flask dev server on Windows
+    app.config["SESSION_COOKIE_SECURE"] = False
+    app.config["REMEMBER_COOKIE_SECURE"] = False
+    app.run(debug=True, host="127.0.0.1", port=5000)

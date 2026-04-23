@@ -3,6 +3,7 @@
 <section class="card form-card">
     <h2>Login</h2>
     <form method="POST">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
         <label>Email</label>
         <input type="email" name="email" required />
 
@@ -16,6 +17,6 @@
 
         <button type="submit" class="btn">Login and Send OTP</button>
     </form>
-    <p class="hint">OTP is delivered to your registered email address.</p>
+    <p class="hint">Only admin-approved accounts can login. OTP is delivered to your registered email.</p>
 </section>
 {% endblock %}

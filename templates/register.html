@@ -2,7 +2,9 @@
 {% block content %}
 <section class="card form-card">
     <h2>Create Account</h2>
+    <p class="hint">After signup, admin approval is required before you can login.</p>
     <form method="POST">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
         <label>Full Name</label>
         <input type="text" name="full_name" required maxlength="100" />
 

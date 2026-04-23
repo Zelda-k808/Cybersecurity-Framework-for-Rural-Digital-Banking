@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="card">
+    <h2>Pending Signup Requests</h2>
+    {% if requests %}
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Full Name</th>
+                    <th>Email</th>
+                    <th>Requested At (UTC)</th>
+                    <th>Action</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for req in requests %}
+                    <tr>
+                        <td>{{ req.id }}</td>
+                        <td>{{ req.full_name }}</td>
+                        <td>{{ req.email }}</td>
+                        <td>{{ req.created_at }}</td>
+                        <td>
+                            <form method="POST" action="{{ url_for('approve_signup_request', request_id=req.id) }}">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+                                <button type="submit" class="btn">Approve</button>
+                            </form>
+                        </td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    {% else %}
+        <p>No pending signup requests.</p>
+    {% endif %}
+</section>
+{% endblock %}
