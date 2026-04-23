@@ -18,6 +18,17 @@ from werkzeug.middleware.proxy_fix import ProxyFix
 
 
 BASE_DIR = os.path.abspath(os.path.dirname(__file__))
+
+# Auto-load .env file for local development
+_env_path = os.path.join(BASE_DIR, ".env")
+if os.path.exists(_env_path):
+    with open(_env_path) as _f:
+        for _line in _f:
+            _line = _line.strip()
+            if _line and not _line.startswith("#") and "=" in _line:
+                _k, _, _v = _line.partition("=")
+                os.environ.setdefault(_k.strip(), _v.strip())
+
 MAX_FAILED_ATTEMPTS = 5
 LOCK_MINUTES = 15
 OTP_EXPIRY_MINUTES = 5
@@ -27,20 +38,83 @@ LANG_CONTENT = {
     "en": {
         "app_title": "Secure Rural Banking",
         "hero_text": "Safe and simple banking for rural communities.",
-        "register": "Register",
-        "login": "Login",
+        "lang_en": "English", "lang_hi": "हिन्दी", "lang_mr": "मराठी",
+        "nav_home": "Home", "nav_dashboard": "Dashboard", "nav_transfer": "Transfer",
+        "nav_history": "History", "nav_signup_requests": "Signup Requests",
+        "nav_security_logs": "Security Logs", "nav_transaction_logs": "Transaction Logs",
+        "nav_logout": "Logout", "register": "Register", "login": "Login",
+        "register_title": "Create Account", "full_name_label": "Full Name",
+        "email_label": "Email", "password_label": "Password",
+        "register_btn": "Submit Registration",
+        "register_hint": "Your account will be reviewed by an admin before activation.",
+        "login_title": "Sign In", "remember_me_label": "Remember me", "login_btn": "Sign In",
+        "otp_title": "Verify OTP", "otp_label": "Enter 6-digit OTP sent to",
+        "otp_btn": "Verify", "resend_otp_btn": "Resend OTP",
+        "dashboard_title": "Your Dashboard", "welcome_msg": "Welcome back",
+        "balance_label": "Account Balance", "account_number_label": "Account Number",
+        "transfer_title": "Send Money", "receiver_name_label": "Receiver Name",
+        "receiver_account_label": "Receiver Account Number (11 digits)",
+        "amount_label": "Amount (INR)", "note_label": "Note (optional)",
+        "transfer_btn": "Submit Transfer", "history_title": "Transaction History",
+        "admin_requests_title": "Pending Signup Requests",
+        "admin_logs_title": "Security Activity Logs",
+        "admin_txn_logs_title": "Transaction Logs",
+        "approve_btn": "Approve", "reject_btn": "Reject",
+        "no_records": "No records found.", "back_btn": "Back",
     },
     "hi": {
         "app_title": "सुरक्षित ग्रामीण बैंकिंग",
         "hero_text": "ग्रामीण समुदायों के लिए सुरक्षित और सरल बैंकिंग।",
-        "register": "रजिस्टर करें",
-        "login": "लॉगिन करें",
+        "lang_en": "English", "lang_hi": "हिन्दी", "lang_mr": "मराठी",
+        "nav_home": "होम", "nav_dashboard": "डैशबोर्ड", "nav_transfer": "ट्रांसफर",
+        "nav_history": "इतिहास", "nav_signup_requests": "पंजीकरण अनुरोध",
+        "nav_security_logs": "सुरक्षा लॉग", "nav_transaction_logs": "लेनदेन लॉग",
+        "nav_logout": "लॉगआउट", "register": "रजिस्टर करें", "login": "लॉगिन करें",
+        "register_title": "खाता बनाएँ", "full_name_label": "पूरा नाम",
+        "email_label": "ईमेल", "password_label": "पासवर्ड",
+        "register_btn": "पंजीकरण जमा करें",
+        "register_hint": "आपका खाता सक्रिय होने से पहले व्यवस्थापक द्वारा समीक्षा की जाएगी।",
+        "login_title": "साइन इन करें", "remember_me_label": "मुझे याद रखें", "login_btn": "साइन इन करें",
+        "otp_title": "OTP सत्यापित करें", "otp_label": "6-अंकीय OTP दर्ज करें भेजा गया",
+        "otp_btn": "सत्यापित करें", "resend_otp_btn": "OTP पुनः भेजें",
+        "dashboard_title": "आपका डैशबोर्ड", "welcome_msg": "वापसी पर स्वागत है",
+        "balance_label": "खाता शेष", "account_number_label": "खाता संख्या",
+        "transfer_title": "पैसे भेजें", "receiver_name_label": "प्राप्तकर्ता का नाम",
+        "receiver_account_label": "प्राप्तकर्ता खाता संख्या (11 अंक)",
+        "amount_label": "राशि (INR)", "note_label": "नोट (वैकल्पिक)",
+        "transfer_btn": "ट्रांसफर जमा करें", "history_title": "लेनदेन इतिहास",
+        "admin_requests_title": "लंबित पंजीकरण अनुरोध",
+        "admin_logs_title": "सुरक्षा गतिविधि लॉग",
+        "admin_txn_logs_title": "लेनदेन लॉग",
+        "approve_btn": "स्वीकृत करें", "reject_btn": "अस्वीकार करें",
+        "no_records": "कोई रिकॉर्ड नहीं मिला।", "back_btn": "वापस",
     },
     "mr": {
         "app_title": "सुरक्षित ग्रामीण बँकिंग",
         "hero_text": "ग्रामीण समुदायांसाठी सुरक्षित आणि सोपी बँकिंग.",
-        "register": "नोंदणी करा",
-        "login": "लॉगिन करा",
+        "lang_en": "English", "lang_hi": "हिन्दी", "lang_mr": "मराठी",
+        "nav_home": "मुख्यपृष्ठ", "nav_dashboard": "डॅशबोर्ड", "nav_transfer": "हस्तांतरण",
+        "nav_history": "इतिहास", "nav_signup_requests": "नोंदणी विनंत्या",
+        "nav_security_logs": "सुरक्षा नोंदी", "nav_transaction_logs": "व्यवहार नोंदी",
+        "nav_logout": "लॉगआउट", "register": "नोंदणी करा", "login": "लॉगिन करा",
+        "register_title": "खाते तयार करा", "full_name_label": "पूर्ण नाव",
+        "email_label": "ईमेल", "password_label": "पासवर्ड",
+        "register_btn": "नोंदणी सादर करा",
+        "register_hint": "तुमच्या खात्याचे सक्रियकरणापूर्वी प्रशासकाद्वारे पुनरावलोकन केले जाईल.",
+        "login_title": "साइन इन करा", "remember_me_label": "मला लक्षात ठेवा", "login_btn": "साइन इन करा",
+        "otp_title": "OTP सत्यापित करा", "otp_label": "पाठवलेला 6-अंकी OTP प्रविष्ट करा",
+        "otp_btn": "सत्यापित करा", "resend_otp_btn": "OTP पुन्हा पाठवा",
+        "dashboard_title": "तुमचा डॅशबोर्ड", "welcome_msg": "परत आल्याबद्दल स्वागत आहे",
+        "balance_label": "खाते शिल्लक", "account_number_label": "खाते क्रमांक",
+        "transfer_title": "पैसे पाठवा", "receiver_name_label": "प्राप्तकर्त्याचे नाव",
+        "receiver_account_label": "प्राप्तकर्त्याचा खाते क्रमांक (11 अंक)",
+        "amount_label": "रक्कम (INR)", "note_label": "नोंद (पर्यायी)",
+        "transfer_btn": "हस्तांतरण सादर करा", "history_title": "व्यवहार इतिहास",
+        "admin_requests_title": "प्रलंबित नोंदणी विनंत्या",
+        "admin_logs_title": "सुरक्षा क्रियाकलाप नोंदी",
+        "admin_txn_logs_title": "व्यवहार नोंदी",
+        "approve_btn": "मंजूर करा", "reject_btn": "नाकारा",
+        "no_records": "कोणतेही रेकॉर्ड सापडले नाहीत.", "back_btn": "मागे",
     },
 }
 
@@ -114,6 +188,7 @@ def init_db():
             password_hash TEXT NOT NULL,
             role TEXT NOT NULL DEFAULT 'customer',
             balance REAL NOT NULL DEFAULT 5000.00,
+            account_number TEXT UNIQUE,
             created_at TEXT NOT NULL
         );
 
@@ -132,6 +207,7 @@ def init_db():
             txn_type TEXT NOT NULL,
             amount REAL NOT NULL,
             receiver_name TEXT,
+            receiver_account_number TEXT,
             note TEXT,
             created_at TEXT NOT NULL,
             FOREIGN KEY(user_id) REFERENCES users(id)
@@ -166,8 +242,30 @@ def init_db():
             reviewed_at TEXT,
             created_at TEXT NOT NULL
         );
+
+        CREATE TABLE IF NOT EXISTS transaction_logs (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            txn_id INTEGER NOT NULL,
+            sender_id INTEGER NOT NULL,
+            receiver_account_number TEXT NOT NULL,
+            amount REAL NOT NULL,
+            note TEXT,
+            ip_address TEXT NOT NULL,
+            created_at TEXT NOT NULL,
+            FOREIGN KEY(txn_id) REFERENCES transactions(id),
+            FOREIGN KEY(sender_id) REFERENCES users(id)
+        );
         """
     )
+    # Migrations for pre-existing databases (ignore if column already exists)
+    for migration_sql in [
+        "ALTER TABLE users ADD COLUMN account_number TEXT UNIQUE",
+        "ALTER TABLE transactions ADD COLUMN receiver_account_number TEXT",
+    ]:
+        try:
+            db.execute(migration_sql)
+        except Exception:
+            pass
     db.commit()
 
 
@@ -212,6 +310,33 @@ def log_activity(user_id, event_type, description):
         VALUES (?, ?, ?, ?, ?)
         """,
         (user_id, event_type, ip, description, now_iso()),
+    )
+    db.commit()
+
+
+def generate_unique_account_number():
+    """Generate a unique 11-digit account number (prefix 10 + 9 random digits)."""
+    db = get_db()
+    while True:
+        acc_num = "10" + "".join([str(random.randint(0, 9)) for _ in range(9)])
+        existing = db.execute(
+            "SELECT id FROM users WHERE account_number = ?", (acc_num,)
+        ).fetchone()
+        if not existing:
+            return acc_num
+
+
+def log_transaction(txn_id, sender_id, receiver_account_number, amount, note):
+    """Write a separate transaction-specific audit record."""
+    ip = get_client_ip()
+    db = get_db()
+    db.execute(
+        """
+        INSERT INTO transaction_logs
+            (txn_id, sender_id, receiver_account_number, amount, note, ip_address, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+        """,
+        (txn_id, sender_id, receiver_account_number, amount, note, ip, now_iso()),
     )
     db.commit()
 
@@ -445,6 +570,15 @@ def boot():
     init_db()
 
 
+@app.after_request
+def set_security_headers(response):
+    """Prevent browsers from caching pages — stops back-button access after logout."""
+    response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+    response.headers["Pragma"] = "no-cache"
+    response.headers["Expires"] = "0"
+    return response
+
+
 @app.context_processor
 def inject_global_data():
     lang = session.get("lang", "en")
@@ -509,6 +643,8 @@ def register():
 
 @app.route("/login", methods=["GET", "POST"])
 def login():
+    if current_user.is_authenticated:
+        return redirect(url_for("dashboard"))
     if request.method == "POST":
         email = request.form.get("email", "").strip().lower()
         password = request.form.get("password", "")
@@ -559,6 +695,8 @@ def login():
 
 @app.route("/verify-otp", methods=["GET", "POST"])
 def verify_otp():
+    if current_user.is_authenticated:
+        return redirect(url_for("dashboard"))
     email = session.get("pending_user_email")
 
     if not email:
@@ -714,15 +852,17 @@ def approve_signup_request(request_id):
         flash("User already existed. Request marked approved.", "info")
         return redirect(url_for("admin_requests"))
 
+    acc_num = generate_unique_account_number()
     db.execute(
         """
-        INSERT INTO users (full_name, email, password_hash, role, created_at)
-        VALUES (?, ?, ?, 'customer', ?)
+        INSERT INTO users (full_name, email, password_hash, role, account_number, created_at)
+        VALUES (?, ?, ?, 'customer', ?, ?)
         """,
         (
             signup_request["full_name"],
             signup_request["email"],
             signup_request["password_hash"],
+            acc_num,
             now_iso(),
         ),
     )
@@ -767,13 +907,18 @@ def dashboard():
 @login_required
 def transfer():
     if request.method == "POST":
-        receiver = request.form.get("receiver", "").strip()
+        receiver_name = request.form.get("receiver", "").strip()
+        receiver_account = request.form.get("receiver_account", "").strip()
         amount_raw = request.form.get("amount", "").strip()
         note = request.form.get("note", "").strip()
 
-        receiver_error = validate_safe_text(receiver, "Receiver name", max_len=80)
+        receiver_error = validate_safe_text(receiver_name, "Receiver name", max_len=80)
         if receiver_error:
             flash(receiver_error, "danger")
+            return redirect(url_for("transfer"))
+
+        if not re.fullmatch(r"\d{11}", receiver_account):
+            flash("Receiver account number must be exactly 11 digits.", "danger")
             return redirect(url_for("transfer"))
 
         if note:
@@ -791,24 +936,42 @@ def transfer():
             return redirect(url_for("transfer"))
 
         db = get_db()
-        row = db.execute("SELECT balance FROM users WHERE id = ?", (current_user.id,)).fetchone()
-        current_balance = row["balance"] if row else 0
+        sender_row = db.execute("SELECT * FROM users WHERE id = ?", (current_user.id,)).fetchone()
 
+        if sender_row and sender_row["account_number"] == receiver_account:
+            flash("You cannot transfer to your own account.", "danger")
+            return redirect(url_for("transfer"))
+
+        receiver_row = db.execute(
+            "SELECT * FROM users WHERE account_number = ?", (receiver_account,)
+        ).fetchone()
+        if not receiver_row:
+            flash("Receiver account number not found.", "danger")
+            return redirect(url_for("transfer"))
+
+        current_balance = sender_row["balance"] if sender_row else 0
         if amount > current_balance:
             flash("Insufficient balance.", "danger")
             return redirect(url_for("transfer"))
 
-        new_balance = current_balance - amount
-        db.execute("UPDATE users SET balance = ? WHERE id = ?", (new_balance, current_user.id))
-        db.execute(
+        db.execute("UPDATE users SET balance = balance - ? WHERE id = ?", (amount, current_user.id))
+        db.execute("UPDATE users SET balance = balance + ? WHERE account_number = ?",
+                   (amount, receiver_account))
+        cursor = db.execute(
             """
-            INSERT INTO transactions (user_id, txn_type, amount, receiver_name, note, created_at)
-            VALUES (?, 'debit', ?, ?, ?, ?)
+            INSERT INTO transactions
+                (user_id, txn_type, amount, receiver_name, receiver_account_number, note, created_at)
+            VALUES (?, 'debit', ?, ?, ?, ?, ?)
             """,
-            (current_user.id, amount, receiver, note, now_iso()),
+            (current_user.id, amount, receiver_name, receiver_account, note, now_iso()),
         )
+        txn_id = cursor.lastrowid
         db.commit()
-        log_activity(current_user.id, "transfer_success", f"Transferred {amount:.2f} to {receiver}")
+        log_transaction(txn_id, current_user.id, receiver_account, amount, note)
+        log_activity(
+            current_user.id, "transfer_success",
+            f"Transferred {amount:.2f} to account {receiver_account} ({receiver_name})"
+        )
         flash("Transfer successful.", "success")
         return redirect(url_for("history"))
 
@@ -850,7 +1013,27 @@ def admin_logs():
     return render_template("admin_logs.html", logs=rows)
 
 
-@app.route("/logout")
+@app.route("/admin/transaction-logs")
+@login_required
+def admin_transaction_logs():
+    if current_user.role != "admin":
+        flash("Unauthorized. Admin access required.", "danger")
+        return redirect(url_for("dashboard"))
+
+    db = get_db()
+    rows = db.execute(
+        """
+        SELECT tl.id, u.full_name AS sender_name, tl.receiver_account_number,
+               tl.amount, tl.note, tl.ip_address, tl.created_at
+        FROM transaction_logs tl
+        LEFT JOIN users u ON tl.sender_id = u.id
+        ORDER BY tl.created_at DESC
+        LIMIT 200
+        """
+    ).fetchall()
+    return render_template("admin_transaction_logs.html", logs=rows)
+
+
 @login_required
 def logout():
     log_activity(current_user.id, "logout", "User logged out")
