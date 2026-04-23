@@ -24,16 +24,18 @@ class SecurityTestCase(unittest.TestCase):
 
     def create_user_directly(self, name="Test User", email="test@example.com", password="StrongPass123", role="customer"):
         password_hash = bcrypt.generate_password_hash(password).decode("utf-8")
+        import random
+        account_number = str(random.randint(10_000_000_000, 99_999_999_999))
         with app.app_context():
             db_path = app.config["DATABASE"]
             import sqlite3
             db = sqlite3.connect(db_path)
             db.execute(
                 """
-                INSERT INTO users (full_name, email, password_hash, role, created_at)
-                VALUES (?, ?, ?, ?, ?)
+                INSERT INTO users (full_name, email, password_hash, role, account_number, created_at)
+                VALUES (?, ?, ?, ?, ?, ?)
                 """,
-                (name, email, password_hash, role, datetime.now(timezone.utc).isoformat()),
+                (name, email, password_hash, role, account_number, datetime.now(timezone.utc).isoformat()),
             )
             db.commit()
             db.close()

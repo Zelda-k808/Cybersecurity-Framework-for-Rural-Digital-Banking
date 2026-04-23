@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% block content %}
 <section class="card">
-    <h2>Pending Signup Requests</h2>
+    <h2>{{ lang_data.admin_requests_title }}</h2>
     {% if requests %}
         <table class="table">
             <thead>
@@ -23,7 +23,7 @@
                         <td>
                             <form method="POST" action="{{ url_for('approve_signup_request', request_id=req.id) }}">
                                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
-                                <button type="submit" class="btn">Approve</button>
+                                <button type="submit" class="btn">{{ lang_data.approve_btn }}</button>
                             </form>
                         </td>
                     </tr>
@@ -31,7 +31,7 @@
             </tbody>
         </table>
     {% else %}
-        <p>No pending signup requests.</p>
+        <p class="hint">{{ lang_data.no_records }}</p>
     {% endif %}
 </section>
 {% endblock %}

@@ -1,18 +1,19 @@
 {% extends "base.html" %}
 {% block content %}
 <section class="card form-card">
-    <h2>Verify OTP</h2>
-    <p>OTP sent to account: <strong>{{ email }}</strong></p>
+    <h2>{{ lang_data.otp_title }}</h2>
+    <p>{{ lang_data.otp_label }}: <strong>{{ email }}</strong></p>
     <p class="hint">If email delivery is unavailable, this can be swapped with SMS OTP for rural deployment.</p>
     <form method="POST">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
-        <label>6-digit OTP</label>
-        <input type="text" name="otp" required minlength="6" maxlength="6" pattern="[0-9]{6}" />
-        <button type="submit" class="btn">Verify and Login</button>
+        <label for="otp">{{ lang_data.otp_label }}</label>
+        <input type="text" id="otp" name="otp" required minlength="6" maxlength="6"
+               pattern="[0-9]{6}" inputmode="numeric" autocomplete="one-time-code" />
+        <button type="submit" class="btn">{{ lang_data.otp_btn }}</button>
     </form>
-    <form method="POST" action="{{ url_for('resend_otp') }}">
+    <form method="POST" action="{{ url_for('resend_otp') }}" style="margin-top:10px">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
-        <button type="submit" class="btn alt">Resend OTP</button>
+        <button type="submit" class="btn alt">{{ lang_data.resend_otp_btn }}</button>
     </form>
 </section>
 {% endblock %}

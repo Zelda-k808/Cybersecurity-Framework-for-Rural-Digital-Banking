@@ -898,9 +898,10 @@ def approve_signup_request(request_id):
 @login_required
 def dashboard():
     db = get_db()
-    row = db.execute("SELECT balance FROM users WHERE id = ?", (current_user.id,)).fetchone()
+    row = db.execute("SELECT balance, account_number FROM users WHERE id = ?", (current_user.id,)).fetchone()
     balance = row["balance"] if row else 0
-    return render_template("dashboard.html", balance=balance)
+    account_number = row["account_number"] if row else None
+    return render_template("dashboard.html", balance=balance, account_number=account_number)
 
 
 @app.route("/transfer", methods=["GET", "POST"])
@@ -984,7 +985,7 @@ def history():
     db = get_db()
     rows = db.execute(
         """
-        SELECT txn_type, amount, receiver_name, note, created_at
+        SELECT txn_type, amount, receiver_name, receiver_account_number, note, created_at
         FROM transactions
         WHERE user_id = ?
         ORDER BY created_at DESC
@@ -1034,6 +1035,7 @@ def admin_transaction_logs():
     return render_template("admin_transaction_logs.html", logs=rows)
 
 
+@app.route("/logout")
 @login_required
 def logout():
     log_activity(current_user.id, "logout", "User logged out")

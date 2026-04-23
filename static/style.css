@@ -133,6 +133,12 @@ input {
     font-size: 0.95rem;
 }
 
+.mono {
+    font-family: "Courier New", Courier, monospace;
+    letter-spacing: 0.04em;
+    font-size: 0.97rem;
+}
+
 .balance {
     font-size: 1.35rem;
     font-weight: 700;
@@ -154,4 +160,49 @@ input {
 
 .table th {
     background: #eef4fb;
+}
+
+/* ===== Focus-loss security shield ===== */
+#focus-shield {
+    display: none;
+    position: fixed;
+    inset: 0;
+    z-index: 9999;
+    background: rgba(6, 57, 112, 0.82);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+}
+
+#focus-shield.visible {
+    display: flex;
+}
+
+.shield-inner {
+    text-align: center;
+    color: #fff;
+    user-select: none;
+}
+
+.shield-inner svg {
+    color: #7ecbff;
+    margin-bottom: 18px;
+    display: block;
+    margin-left: auto;
+    margin-right: auto;
+}
+
+.shield-inner p {
+    font-size: 1.1rem;
+    line-height: 1.7;
+    opacity: 0.95;
+    margin: 0;
+}
+
+/* ===== Active language button ===== */
+.lang-switch a.active-lang {
+    background: rgba(255, 255, 255, 0.35);
+    font-weight: 800;
 }

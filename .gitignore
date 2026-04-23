@@ -3,10 +3,19 @@ __pycache__/
 .venv/
 venv/
 banking.db
-security.log
-transactions.log
 banking.db-journal
 
+# Log files — contain sensitive activity data
+security.log
+transactions.log
+*.log
+
 # Dev secrets — never commit these
-run_dev.bat
 .env
+run_dev.bat
+
+# Deployment helper — Windows-only, not needed on server
+prepare_deploy.bat
+
+# Wiki files — managed separately via GitHub Wiki
+wiki/

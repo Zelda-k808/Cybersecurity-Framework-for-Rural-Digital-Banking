@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% block content %}
 <section class="card">
-    <h2>Admin Security Logs</h2>
+    <h2>{{ lang_data.admin_logs_title }}</h2>
     <p class="hint">Visible only to users with role <strong>admin</strong>.</p>
     {% if logs %}
         <table class="table">
@@ -19,7 +19,7 @@
                     <tr>
                         <td>{{ log.user_id or "-" }}</td>
                         <td>{{ log.event_type }}</td>
-                        <td>{{ log.ip_address }}</td>
+                        <td class="mono">{{ log.ip_address }}</td>
                         <td>{{ log.description }}</td>
                         <td>{{ log.created_at }}</td>
                     </tr>
@@ -27,7 +27,7 @@
             </tbody>
         </table>
     {% else %}
-        <p>No security logs available yet.</p>
+        <p class="hint">{{ lang_data.no_records }}</p>
     {% endif %}
 </section>
 {% endblock %}

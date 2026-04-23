@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="{{ selected_lang }}">
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -7,29 +7,46 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}" />
 </head>
 <body>
+
+    <!-- ===== BLUR SHIELD (focus-loss security layer) ===== -->
+    <div id="focus-shield" aria-hidden="true">
+        <div class="shield-inner">
+            <svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 24 24"
+                 fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"
+                 stroke-linejoin="round">
+                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+            </svg>
+            <p>Session paused for security.<br>Click anywhere or return to this tab to continue.</p>
+        </div>
+    </div>
+
     <header class="topbar">
         <div>
             <h1>{{ lang_data.app_title }}</h1>
             <p class="subtitle">{{ lang_data.hero_text }}</p>
         </div>
         <div class="lang-switch">
-            <a href="{{ url_for('set_language', lang='en') }}">EN</a>
-            <a href="{{ url_for('set_language', lang='hi') }}">HI</a>
-            <a href="{{ url_for('set_language', lang='mr') }}">MR</a>
+            <a href="{{ url_for('set_language', lang='en') }}"
+               class="{{ 'active-lang' if selected_lang == 'en' }}">{{ lang_data.lang_en }}</a>
+            <a href="{{ url_for('set_language', lang='hi') }}"
+               class="{{ 'active-lang' if selected_lang == 'hi' }}">{{ lang_data.lang_hi }}</a>
+            <a href="{{ url_for('set_language', lang='mr') }}"
+               class="{{ 'active-lang' if selected_lang == 'mr' }}">{{ lang_data.lang_mr }}</a>
         </div>
     </header>
 
     <nav class="navbar">
-        <a href="{{ url_for('home') }}">Home</a>
+        <a href="{{ url_for('home') }}">{{ lang_data.nav_home }}</a>
         {% if current_user.is_authenticated %}
-            <a href="{{ url_for('dashboard') }}">Dashboard</a>
-            <a href="{{ url_for('transfer') }}">Transfer</a>
-            <a href="{{ url_for('history') }}">History</a>
+            <a href="{{ url_for('dashboard') }}">{{ lang_data.nav_dashboard }}</a>
+            <a href="{{ url_for('transfer') }}">{{ lang_data.nav_transfer }}</a>
+            <a href="{{ url_for('history') }}">{{ lang_data.nav_history }}</a>
             {% if current_user.role == "admin" %}
-                <a href="{{ url_for('admin_requests') }}">Signup Requests</a>
-                <a href="{{ url_for('admin_logs') }}">Security Logs</a>
+                <a href="{{ url_for('admin_requests') }}">{{ lang_data.nav_signup_requests }}</a>
+                <a href="{{ url_for('admin_logs') }}">{{ lang_data.nav_security_logs }}</a>
+                <a href="{{ url_for('admin_transaction_logs') }}">{{ lang_data.nav_transaction_logs }}</a>
             {% endif %}
-            <a href="{{ url_for('logout') }}">Logout</a>
+            <a href="{{ url_for('logout') }}">{{ lang_data.nav_logout }}</a>
         {% else %}
             <a href="{{ url_for('register') }}">{{ lang_data.register }}</a>
             <a href="{{ url_for('login') }}">{{ lang_data.login }}</a>
@@ -46,5 +63,60 @@
         {% endwith %}
         {% block content %}{% endblock %}
     </main>
+
+    <!-- ===== SECURITY SCRIPTS ===== -->
+    <script>
+    // --- 1. Blur / Focus-loss shield ---
+    (function () {
+        var shield = document.getElementById('focus-shield');
+
+        function showShield() {
+            if (shield) shield.classList.add('visible');
+        }
+        function hideShield() {
+            if (shield) shield.classList.remove('visible');
+        }
+
+        window.addEventListener('blur', showShield);
+        window.addEventListener('focus', hideShield);
+        document.addEventListener('visibilitychange', function () {
+            if (document.hidden) { showShield(); } else { hideShield(); }
+        });
+        if (shield) {
+            shield.addEventListener('click', hideShield);
+        }
+    })();
+
+    // --- 2. Block paste / copy / cut on all password fields ---
+    (function () {
+        function blockClipboard(e) {
+            e.preventDefault();
+            return false;
+        }
+        document.querySelectorAll('input[type="password"]').forEach(function (el) {
+            el.addEventListener('paste', blockClipboard);
+            el.addEventListener('copy', blockClipboard);
+            el.addEventListener('cut', blockClipboard);
+        });
+        // Also block on dynamically-added fields (MutationObserver)
+        var observer = new MutationObserver(function (mutations) {
+            mutations.forEach(function (m) {
+                m.addedNodes.forEach(function (node) {
+                    if (node.nodeType === 1) {
+                        var fields = node.tagName === 'INPUT' && node.type === 'password'
+                            ? [node]
+                            : Array.from(node.querySelectorAll('input[type="password"]'));
+                        fields.forEach(function (el) {
+                            el.addEventListener('paste', blockClipboard);
+                            el.addEventListener('copy', blockClipboard);
+                            el.addEventListener('cut', blockClipboard);
+                        });
+                    }
+                });
+            });
+        });
+        observer.observe(document.body, { childList: true, subtree: true });
+    })();
+    </script>
 </body>
 </html>
