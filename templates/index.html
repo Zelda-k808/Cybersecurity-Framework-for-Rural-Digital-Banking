@@ -1,17 +1,34 @@
 {% extends "base.html" %}
 {% block content %}
-<section class="card">
+<section class="hero">
     <h2>{{ lang_data.app_title }}</h2>
     <p>{{ lang_data.hero_text }}</p>
-    <ul>
-        <li>OTP-based login with real verification</li>
-        <li>Password hashing with bcrypt</li>
-        <li>Login attempt monitoring and temporary lockouts</li>
-        <li>Transaction logging and activity audit trails</li>
-    </ul>
-    <div class="button-row">
+    <div class="hero-actions">
         <a class="btn" href="{{ url_for('register') }}">{{ lang_data.register }}</a>
         <a class="btn alt" href="{{ url_for('login') }}">{{ lang_data.login }}</a>
+    </div>
+</section>
+
+<section class="features">
+    <div class="feature-card">
+        <div class="feature-icon">&#128274;</div>
+        <h3>Dual-Factor Authentication</h3>
+        <p>Email OTP + TOTP authenticator app for every login</p>
+    </div>
+    <div class="feature-card">
+        <div class="feature-icon">&#128170;</div>
+        <h3>Argon2id Hashing</h3>
+        <p>Industry-leading password security with memory-hard hashing</p>
+    </div>
+    <div class="feature-card">
+        <div class="feature-icon">&#128187;</div>
+        <h3>Audit Logging</h3>
+        <p>Complete activity trails with IP tracking and anomaly detection</p>
+    </div>
+    <div class="feature-card">
+        <div class="feature-icon">&#128752;</div>
+        <h3>Admin Approval</h3>
+        <p>Bank officers approve every new account for fraud prevention</p>
     </div>
 </section>
 {% endblock %}

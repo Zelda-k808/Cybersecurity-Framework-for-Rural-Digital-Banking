@@ -31,7 +31,7 @@
         <p class="hint">{{ lang_data.no_records }}</p>
     {% endif %}
     {% if total_pages > 1 %}
-    <div class="pagination" style="margin-top:1rem; display:flex; justify-content:center; gap:1rem;">
+    <div class="pagination">
         {% if page > 1 %}
             <a class="btn alt" href="{{ url_for('history', page=page-1) }}">{{ lang_data.prev_page }}</a>
         {% endif %}

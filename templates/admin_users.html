@@ -26,13 +26,13 @@
                         <td>{{ u.created_at }}</td>
                         <td>
                             {% if u.role != "admin" %}
-                                <form method="POST" action="{{ url_for('toggle_user_active', user_id=u.id) }}" style="display:inline;">
+                                <form method="POST" action="{{ url_for('toggle_user_active', user_id=u.id) }}" class="inline-form">
                                     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
                                     {% if u.is_active %}
-                                        <button type="submit" class="btn alt" style="padding:.4rem .9rem;font-size:.85rem;"
+                                        <button type="submit" class="btn alt btn-sm"
                                                 onclick="return confirm('Deactivate this user?')">{{ lang_data.deactivate_btn }}</button>
                                     {% else %}
-                                        <button type="submit" class="btn" style="padding:.4rem .9rem;font-size:.85rem;"
+                                        <button type="submit" class="btn btn-sm"
                                                 onclick="return confirm('Activate this user?')">{{ lang_data.activate_btn }}</button>
                                     {% endif %}
                                 </form>

@@ -59,13 +59,19 @@
     <main class="container">
         {% with messages = get_flashed_messages(with_categories=true) %}
             {% if messages %}
+                <div class="alerts">
                 {% for category, message in messages %}
                     <div class="alert {{ category }}">{{ message }}</div>
                 {% endfor %}
+                </div>
             {% endif %}
         {% endwith %}
         {% block content %}{% endblock %}
     </main>
+
+    <footer class="site-footer">
+        <p>&copy; {{ now().year if now is defined else 2025 }} {{ lang_data.app_title }}. {{ lang_data.footer_secure if 'footer_secure' in lang_data else 'Bank-grade security with Argon2id hashing, dual-factor authentication, and end-to-end audit logging.' }}</p>
+    </footer>
 
     <!-- ===== SECURITY SCRIPTS ===== -->
     <script>

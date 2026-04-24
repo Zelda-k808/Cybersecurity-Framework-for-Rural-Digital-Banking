@@ -1,21 +1,20 @@
 {% extends "base.html" %}
 {% block content %}
-<section class="card form-card">
+<section class="card form-card text-center">
     <h2>{{ lang_data.setup_totp_title }}</h2>
     <p class="hint">{{ lang_data.setup_totp_hint }}</p>
-    <div style="text-align:center; margin:1.5rem 0;">
-        <img src="data:image/png;base64,{{ qr_code }}" alt="{{ lang_data.setup_totp_title }}" style="max-width:240px;" />
+    <div class="qr-wrap">
+        <img src="data:image/png;base64,{{ qr_code }}" alt="{{ lang_data.setup_totp_title }}" />
     </div>
-    <p class="hint" style="text-align:center;">
+    <p class="hint">
         <strong>{{ lang_data.setup_totp_secret_label }}</strong><br>
-        <code style="font-size:1.2rem; letter-spacing:0.1rem;">{{ secret }}</code>
+        <span class="secret-code">{{ secret }}</span>
     </p>
-    <hr style="margin:1.5rem 0;">
-    <form method="POST" style="text-align:center;">
+    <hr class="divider">
+    <form method="POST">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
-        <label for="totp" style="display:block; margin-bottom:0.5rem;">{{ lang_data.totp_label }}</label>
-        <input type="text" id="totp" name="totp" required pattern="\d{6}" maxlength="6" inputmode="numeric" autocomplete="one-time-code" style="max-width:200px; text-align:center; margin-bottom:1rem;" />
-        <br>
+        <label for="totp">{{ lang_data.totp_label }}</label>
+        <input type="text" id="totp" name="totp" required pattern="\d{6}" maxlength="6" inputmode="numeric" autocomplete="one-time-code" style="max-width:200px; text-align:center;" />
         <button type="submit" class="btn">{{ lang_data.totp_verify_btn }}</button>
     </form>
 </section>
