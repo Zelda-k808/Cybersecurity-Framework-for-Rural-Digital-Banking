@@ -11,5 +11,8 @@
 
         <button type="submit" class="btn">{{ lang_data.totp_verify_btn }}</button>
     </form>
+    <div class="button-row" style="justify-content:center; margin-top:1.5rem;">
+        <a class="btn alt" href="{{ url_for('recover_totp') }}">Lost your authenticator? Use backup code</a>
+    </div>
 </section>
 {% endblock %}

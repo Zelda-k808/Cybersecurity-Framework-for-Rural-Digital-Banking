@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="card form-card">
+    <h2>{{ lang_data.totp_recover_title|default('Recover with Backup Code') }}</h2>
+    <p class="hint">Enter one of your 11-digit backup recovery codes to log in.</p>
+    <form method="POST">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+
+        <label for="backup_code">Backup Code</label>
+        <input type="text" id="backup_code" name="backup_code" required pattern="\d{11}" maxlength="11" inputmode="numeric" autocomplete="off" style="max-width:240px; text-align:center;" />
+
+        <button type="submit" class="btn">Verify &amp; Login</button>
+    </form>
+    <div class="button-row" style="justify-content:center; margin-top:1rem;">
+        <a class="btn alt" href="{{ url_for('verify_totp') }}">{{ lang_data.back_btn|default('Back') }}</a>
+    </div>
+</section>
+{% endblock %}

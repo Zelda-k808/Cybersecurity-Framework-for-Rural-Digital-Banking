@@ -261,13 +261,14 @@ logging.basicConfig(
 
 
 class User(UserMixin):
-    def __init__(self, user_id, full_name, email, password_hash, role, totp_secret=None):
+    def __init__(self, user_id, full_name, email, password_hash, role, totp_secret=None, totp_backup_codes=None):
         self.id = str(user_id)
         self.full_name = full_name
         self.email = email
         self.password_hash = password_hash
         self.role = role
         self.totp_secret = totp_secret
+        self.totp_backup_codes = totp_backup_codes
 
 
 def hash_password(password):
@@ -290,6 +291,37 @@ def verify_password(password_hash, password):
 
 def generate_totp_secret():
     return pyotp.random_base32()
+
+
+import json  # noqa: E402
+
+
+def generate_backup_codes(count=6):
+    """Generate one-time-use recovery codes for TOTP fallback."""
+    codes = [f"{secrets.randbelow(10**11):011d}" for _ in range(count)]
+    hashed_codes = [bcrypt.generate_password_hash(code).decode("utf-8") for code in codes]
+    return codes, json.dumps(hashed_codes)
+
+
+def verify_backup_code(email, submitted_code):
+    """Verify a one-time TOTP backup code. If valid, consume it."""
+    if not re.fullmatch(r"\d{11}", submitted_code):
+        return False
+    db = get_db()
+    row = db.execute("SELECT id, totp_backup_codes FROM users WHERE email = ?", (email,)).fetchone()
+    if not row or not row["totp_backup_codes"]:
+        return False
+    hashes = json.loads(row["totp_backup_codes"])
+    for h in hashes[:]:
+        if bcrypt.check_password_hash(h, submitted_code):
+            hashes.remove(h)
+            db.execute(
+                "UPDATE users SET totp_backup_codes = ? WHERE id = ?",
+                (json.dumps(hashes) if hashes else None, row["id"]),
+            )
+            db.commit()
+            return True
+    return False
 
 
 def get_db():
@@ -404,6 +436,7 @@ def init_db():
         "ALTER TABLE otp_challenges ADD COLUMN purpose TEXT DEFAULT 'login'",
         "CREATE TABLE IF NOT EXISTS rate_limits (id INTEGER PRIMARY KEY AUTOINCREMENT, ip_address TEXT NOT NULL, endpoint TEXT NOT NULL, window_start TEXT NOT NULL, count INTEGER NOT NULL DEFAULT 1)",
         "ALTER TABLE users ADD COLUMN totp_secret TEXT",
+        "ALTER TABLE users ADD COLUMN totp_backup_codes TEXT",
     ]:
         try:
             db.execute(migration_sql)
@@ -491,7 +524,15 @@ def get_user_by_email(email):
     row = db.execute("SELECT * FROM users WHERE email = ?", (email,)).fetchone()
     if not row:
         return None
-    return User(row["id"], row["full_name"], row["email"], row["password_hash"], row["role"], row["totp_secret"] if "totp_secret" in row.keys() else None)
+    return User(
+        row["id"],
+        row["full_name"],
+        row["email"],
+        row["password_hash"],
+        row["role"],
+        row["totp_secret"] if "totp_secret" in row.keys() else None,
+        row["totp_backup_codes"] if "totp_backup_codes" in row.keys() else None,
+    )
 
 
 def get_pending_signup_by_email(email):
@@ -667,13 +708,14 @@ def create_admin_user(full_name, email, password):
     password_hash = hash_password(password)
     acc_num = generate_unique_account_number()
     totp_secret = generate_totp_secret()
+    _, backup_codes_hash = generate_backup_codes()
     db = get_db()
     db.execute(
         """
-        INSERT INTO users (full_name, email, password_hash, role, account_number, totp_secret, created_at)
-        VALUES (?, ?, ?, 'admin', ?, ?, ?)
+        INSERT INTO users (full_name, email, password_hash, role, account_number, totp_secret, totp_backup_codes, created_at)
+        VALUES (?, ?, ?, 'admin', ?, ?, ?, ?)
         """,
-        (full_name, email, password_hash, acc_num, totp_secret, now_iso()),
+        (full_name, email, password_hash, acc_num, totp_secret, backup_codes_hash, now_iso()),
     )
     db.commit()
     return True, "Admin user created successfully."
@@ -700,7 +742,15 @@ def load_user(user_id):
     row = db.execute("SELECT * FROM users WHERE id = ?", (user_id,)).fetchone()
     if not row:
         return None
-    return User(row["id"], row["full_name"], row["email"], row["password_hash"], row["role"], row["totp_secret"] if "totp_secret" in row.keys() else None)
+    return User(
+        row["id"],
+        row["full_name"],
+        row["email"],
+        row["password_hash"],
+        row["role"],
+        row["totp_secret"] if "totp_secret" in row.keys() else None,
+        row["totp_backup_codes"] if "totp_backup_codes" in row.keys() else None,
+    )
 
 
 def is_locked(email, ip_address):
@@ -1613,22 +1663,81 @@ def setup_totp():
             flash("Invalid TOTP code. Please try again.", "danger")
             return redirect(url_for("setup_totp"))
 
-        # First TOTP verified — complete login
+        # First TOTP verified — generate backup codes and show them before login
+        user = get_user_by_email(email)
+        if not user:
+            flash("Session error. Please login again.", "danger")
+            return redirect(url_for("login"))
+
+        codes, hashed = generate_backup_codes()
+        db = get_db()
+        db.execute(
+            "UPDATE users SET totp_backup_codes = ? WHERE id = ?",
+            (hashed, user.id),
+        )
+        db.commit()
+        session["backup_codes_plaintext"] = codes
+        session.pop("setup_totp_secret", None)
+        log_activity(user.id, "totp_setup_complete", "TOTP configured, backup codes generated")
+        flash("Authenticator verified. Save your recovery codes before continuing.", "success")
+        return redirect(url_for("backup_codes"))
+
+    qr_b64 = generate_totp_qr_code_base64(email, secret)
+    return render_template("setup_totp.html", email=email, secret=secret, qr_code=qr_b64)
+
+
+@app.route("/backup-codes", methods=["GET", "POST"])
+def backup_codes():
+    if current_user.is_authenticated:
+        return redirect(url_for("dashboard"))
+    email = session.get("pending_user_email")
+    codes = session.get("backup_codes_plaintext")
+    if not email or not codes:
+        flash("Session expired. Please login again.", "warning")
+        return redirect(url_for("login"))
+    if request.method == "POST":
         user = get_user_by_email(email)
         if user:
             login_user(user, remember=session.get("pending_remember_me", False))
             session.pop("pending_remember_me", None)
-            session.pop("setup_totp_secret", None)
+            session.pop("backup_codes_plaintext", None)
             clear_pending_auth()
-            log_activity(user.id, "login_success", "User logged in after TOTP setup")
-            flash("Two-factor authentication configured successfully. Login complete.", "success")
+            log_activity(user.id, "login_success", "User logged in after saving backup codes")
+            flash("Login successful.", "success")
             return redirect(url_for("dashboard"))
-
         flash("Session error. Please login again.", "danger")
         return redirect(url_for("login"))
+    return render_template("backup_codes.html", email=email, codes=codes)
 
-    qr_b64 = generate_totp_qr_code_base64(email, secret)
-    return render_template("setup_totp.html", email=email, secret=secret, qr_code=qr_b64)
+
+@app.route("/recover-totp", methods=["GET", "POST"])
+def recover_totp():
+    if current_user.is_authenticated:
+        return redirect(url_for("dashboard"))
+    email = session.get("pending_user_email")
+    if not email:
+        flash("Session expired. Please login again.", "warning")
+        return redirect(url_for("login"))
+    if not session.get("email_otp_verified"):
+        flash("Email OTP verification required first.", "warning")
+        return redirect(url_for("verify_otp"))
+    if request.method == "POST":
+        submitted = request.form.get("backup_code", "").strip()
+        if not re.fullmatch(r"\d{11}", submitted):
+            flash("Backup code must be an 11-digit code.", "danger")
+            return redirect(url_for("recover_totp"))
+        user = get_user_by_email(email)
+        if verify_backup_code(email, submitted):
+            login_user(user, remember=session.get("pending_remember_me", False))
+            session.pop("pending_remember_me", None)
+            clear_pending_auth()
+            log_activity(user.id, "login_success", f"User logged in using backup code for email={email}")
+            flash("Login successful using backup code. Please set up a new authenticator app from your dashboard.", "warning")
+            return redirect(url_for("dashboard"))
+        log_activity(user.id, "backup_code_failed", f"Invalid backup code attempt for email={email}")
+        flash("Invalid or already-used backup code. Please try again.", "danger")
+        return redirect(url_for("recover_totp"))
+    return render_template("recover_totp.html", email=email)
 
 
 @app.route("/verify-totp", methods=["GET", "POST"])

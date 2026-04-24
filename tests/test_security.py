@@ -269,6 +269,50 @@ class SecurityTestCase(unittest.TestCase):
         )
         self.assertIn(b"Insufficient balance.", response.data)
 
+    def test_backup_code_login_works_and_is_consumed(self):
+        """A valid 11-digit backup code should log the user in and then be consumed (rejected on reuse)."""
+        import json
+        import sqlite3
+        self.create_user_directly()
+        # Insert a known plaintext backup code hash directly into the DB
+        known_plaintext_code = "12345678901"
+        from app import bcrypt
+        hashed = bcrypt.generate_password_hash(known_plaintext_code).decode("utf-8")
+        db = sqlite3.connect(app.config["DATABASE"])
+        db.execute(
+            "UPDATE users SET totp_backup_codes = ? WHERE email = ?",
+            (json.dumps([hashed]), "test@example.com"),
+        )
+        db.commit()
+        db.close()
+
+        # Login steps: password + email OTP, then recover with backup code
+        self.login_password_step()
+        self.complete_email_otp_step()
+
+        # GET recover-totp should be reachable
+        get_resp = self.client.get("/recover-totp")
+        self.assertEqual(get_resp.status_code, 200)
+
+        # First use succeeds and logs the user in
+        post_resp = self.client.post(
+            "/recover-totp",
+            data={"backup_code": known_plaintext_code},
+            follow_redirects=True,
+        )
+        self.assertIn(b"Login successful", post_resp.data)
+
+        # Logout and try again — the same code must be consumed
+        self.client.get("/logout")
+        self.login_password_step()
+        self.complete_email_otp_step()
+        reuse_resp = self.client.post(
+            "/recover-totp",
+            data={"backup_code": known_plaintext_code},
+            follow_redirects=True,
+        )
+        self.assertIn(b"Invalid or already-used backup code", reuse_resp.data)
+
 
 if __name__ == "__main__":
     unittest.main()
