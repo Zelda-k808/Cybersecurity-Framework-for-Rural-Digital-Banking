@@ -14,7 +14,7 @@
     <form method="POST">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
         <label for="totp">{{ lang_data.totp_label }}</label>
-        <input type="text" id="totp" name="totp" required pattern="\d{6}" maxlength="6" inputmode="numeric" autocomplete="one-time-code" style="max-width:200px; text-align:center;" />
+        <input type="text" id="totp" name="totp" required pattern="\d{6}" maxlength="6" inputmode="numeric" autocomplete="one-time-code" />
         <button type="submit" class="btn">{{ lang_data.totp_verify_btn }}</button>
     </form>
 </section>

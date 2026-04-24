@@ -560,6 +560,22 @@ input[type="checkbox"] {
 .mt-0 { margin-top: 0; }
 .mb-0 { margin-bottom: 0; }
 
+/* ===== Backup codes ===== */
+.backup-codes-list {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    margin: 24px 0;
+}
+
+/* ===== Centered form inputs ===== */
+.form-card input[type="text"],
+.form-card input[type="number"],
+.form-card input[type="email"],
+.form-card input[type="password"] {
+    width: 100%;
+}
+
 /* ===== Footer ===== */
 .site-footer {
     text-align: center;

@@ -4,13 +4,13 @@
     <h2>Save Your Backup Codes</h2>
     <p class="hint">These are your one-time recovery codes. Save them securely — you won’t see them again.</p>
 
-    <div class="backup-codes-list" style="display:flex; flex-direction:column; gap:12px; margin:24px 0;">
+    <div class="backup-codes-list">
         {% for code in codes %}
-            <code class="secret-code" style="font-size:1.3rem;">{{ code }}</code>
+            <code class="secret-code">{{ code }}</code>
         {% endfor %}
     </div>
 
-    <p class="hint" style="margin-bottom:24px;">
+    <p class="hint">
         Each code can only be used once. If you lose your authenticator app, use one of these codes to log in.
     </p>
 
