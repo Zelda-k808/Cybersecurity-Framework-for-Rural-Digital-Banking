@@ -15,6 +15,7 @@ import qrcode
 import validators
 from argon2 import PasswordHasher
 from argon2.exceptions import VerifyMismatchError
+import click
 from click import echo
 from flask import Flask, flash, g, redirect, render_template, request, send_from_directory, session, url_for
 from flask_bcrypt import Bcrypt
@@ -734,6 +735,25 @@ def seed_admin():
         if created:
             echo(f"Email: {email}")
             echo("Use ADMIN_PASSWORD env var to set a custom password.")
+
+
+@app.cli.command("reset-totp")
+@click.argument("email")
+def reset_totp_command(email):
+    email = email.strip().lower()
+    with app.app_context():
+        init_db()
+        user = get_user_by_email(email)
+        if not user:
+            echo(f"User not found: {email}")
+            return
+        db = get_db()
+        db.execute(
+            "UPDATE users SET totp_secret = NULL, totp_backup_codes = NULL WHERE id = ?",
+            (user.id,),
+        )
+        db.commit()
+        echo(f"TOTP reset for {email}. They will be prompted to set up a new authenticator on next login.")
 
 
 @login_manager.user_loader
@@ -1831,6 +1851,29 @@ def toggle_user_active(user_id):
     log_activity(current_user.id, f"user_{action}", f"Admin {action} user_id={user_id} email={row['email']}")
     flash(f"User {action} successfully.", "success")
     return redirect(url_for("admin_users"))
+
+
+@app.route("/reset-totp", methods=["GET", "POST"])
+@login_required
+def reset_totp():
+    """Self-service TOTP reset: verify password, clear existing TOTP, and force re-setup on next login."""
+    if request.method == "POST":
+        password = request.form.get("password", "")
+        if not verify_password(current_user.password_hash, password):
+            flash("Incorrect password.", "danger")
+            return redirect(url_for("reset_totp"))
+
+        db = get_db()
+        db.execute(
+            "UPDATE users SET totp_secret = NULL, totp_backup_codes = NULL WHERE id = ?",
+            (current_user.id,),
+        )
+        db.commit()
+        log_activity(current_user.id, "totp_reset_self", "User reset their own authenticator")
+        logout_user()
+        flash("Authenticator reset. Please log in again to set up a new one.", "warning")
+        return redirect(url_for("login"))
+    return render_template("reset_totp.html")
 
 
 @app.route("/logout")

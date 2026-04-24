@@ -16,6 +16,7 @@
     </div>
     <div class="button-row">
         <a class="btn" href="{{ url_for('change_password') }}">{{ lang_data.change_password_title }}</a>
+        <a class="btn alt" href="{{ url_for('reset_totp') }}">Reset Authenticator</a>
     </div>
 </section>
 {% endblock %}

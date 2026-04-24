@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="card form-card">
+    <h2>Reset Authenticator App</h2>
+    <p class="hint">Enter your current password to reset your authenticator. You will be logged out and must set it up again on your next login.</p>
+    <form method="POST">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+
+        <label for="password">Current Password</label>
+        <input type="password" id="password" name="password" required autocomplete="current-password" />
+
+        <button type="submit" class="btn">Reset Authenticator</button>
+    </form>
+    <div class="button-row" style="justify-content:center;">
+        <a class="btn alt" href="{{ url_for('dashboard') }}">{{ lang_data.back_btn|default('Back') }}</a>
+    </div>
+</section>
+{% endblock %}
